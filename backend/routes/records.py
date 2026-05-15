@@ -12,6 +12,7 @@ def _serialize(inv) -> dict:
     return {
         "id": inv.id,
         "platform": inv.platform,
+        "transaction_type": inv.transaction_type,
         "qty": inv.qty,
         "party_name": inv.party_name,
         "gst_number": inv.gst_number,
@@ -23,6 +24,7 @@ def _serialize(inv) -> dict:
         "igst18": inv.igst18,
         "party_address": inv.party_address,
         "cancelled": inv.cancelled,
+        "linked_sale_id": inv.linked_sale_id,
         "document_file": inv.document_file,
         "status": inv.status,
         "created_at": inv.created_at.isoformat() if inv.created_at else None,
@@ -32,8 +34,9 @@ def _serialize(inv) -> dict:
 @router.get("/records")
 def list_records(
     skip: int = 0,
-    limit: int = 200,
+    limit: int = 500,
     platform: Optional[str] = None,
+    transaction_type: Optional[str] = None,
     cancelled: Optional[bool] = None,
     search: Optional[str] = None,
     db: Session = Depends(get_db),
@@ -41,6 +44,8 @@ def list_records(
     q = db.query(Invoice).filter(Invoice.status == "processed")
     if platform:
         q = q.filter(Invoice.platform == platform)
+    if transaction_type:
+        q = q.filter(Invoice.transaction_type == transaction_type)
     if cancelled is not None:
         q = q.filter(Invoice.cancelled == cancelled)
     if search:

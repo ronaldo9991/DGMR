@@ -11,49 +11,77 @@ const ACCEPTED = {
   "image/webp": [".webp"],
 };
 
-const PLATFORM_STYLES = {
-  Amazon: { bg: "bg-blue-600", light: "bg-blue-50 border-blue-200", text: "text-blue-700", dot: "bg-blue-500" },
-  Flipkart: { bg: "bg-orange-500", light: "bg-orange-50 border-orange-200", text: "text-orange-700", dot: "bg-orange-500" },
-  "Auto-detect": { bg: "bg-slate-700", light: "bg-slate-50 border-slate-200", text: "text-slate-700", dot: "bg-slate-500" },
-};
+/* ── Sale / Return selector ─────────────────────────────────────────── */
+function TypeToggle({ value, onChange }) {
+  return (
+    <div className="flex rounded-xl overflow-hidden border border-slate-200 w-fit">
+      <button
+        type="button"
+        onClick={() => onChange("Sale")}
+        className={`flex items-center gap-2 px-5 py-2.5 text-sm font-bold transition-all ${
+          value === "Sale"
+            ? "bg-emerald-600 text-white shadow-inner"
+            : "bg-white text-slate-500 hover:bg-slate-50"
+        }`}
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5}
+            d="M12 4v16m8-8H4" />
+        </svg>
+        Sale
+      </button>
+      <div className="w-px bg-slate-200" />
+      <button
+        type="button"
+        onClick={() => onChange("Return")}
+        className={`flex items-center gap-2 px-5 py-2.5 text-sm font-bold transition-all ${
+          value === "Return"
+            ? "bg-rose-600 text-white shadow-inner"
+            : "bg-white text-slate-500 hover:bg-slate-50"
+        }`}
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5}
+            d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+        </svg>
+        Return
+      </button>
+    </div>
+  );
+}
 
-function StepBar({ status, error }) {
-  const STEPS = [
-    { id: "queued", label: "Queued" },
-    { id: "uploading", label: "Uploading" },
-    { id: "extracting", label: "Extracting" },
-    { id: "done", label: "Done" },
-  ];
-  const ORDER = ["queued", "uploading", "extracting", "done"];
-  const currentIdx = error ? ORDER.indexOf("extracting") : ORDER.indexOf(status);
+/* ── Per-file step bar ───────────────────────────────────────────────── */
+const STEPS = ["Queued", "Uploading", "Extracting", "Done"];
+const STEP_IDX = { queued: 0, uploading: 1, extracting: 2, done: 3, error: 2 };
 
+function StepBar({ status }) {
+  const current = STEP_IDX[status] ?? 0;
+  const isErr = status === "error";
   return (
     <div className="flex items-center gap-0 mt-3">
-      {STEPS.map((step, i) => {
-        const done = i < currentIdx || (status === "done" && !error);
-        const active = i === currentIdx && !error;
-        const isErr = error && i === currentIdx;
+      {STEPS.map((label, i) => {
+        const done   = i < current || (status === "done");
+        const active = i === current && !isErr;
+        const err    = isErr && i === current;
         return (
-          <div key={step.id} className="flex-1 flex flex-col items-center">
+          <div key={label} className="flex-1 flex flex-col items-center">
             <div className="flex items-center w-full">
-              <div className={`flex-1 h-1 ${i === 0 ? "invisible" : done || active ? (isErr ? "bg-red-300" : "bg-blue-400") : "bg-slate-200"}`} />
-              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs flex-shrink-0 transition-all ${
-                isErr ? "bg-red-500 text-white" :
-                done ? "bg-blue-600 text-white" :
+              <div className={`flex-1 h-1 ${i === 0 ? "invisible" : (done || active) ? (err ? "bg-rose-300" : "bg-emerald-400") : "bg-slate-200"}`} />
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 transition-all ${
+                err    ? "bg-rose-500 text-white" :
+                done   ? "bg-emerald-500 text-white" :
                 active ? "bg-blue-600 text-white ring-4 ring-blue-100" :
-                "bg-slate-200 text-slate-400"
+                         "bg-slate-200 text-slate-400"
               }`}>
-                {done && !isErr ? (
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                  </svg>
-                ) : isErr ? "!" : i + 1}
+                {done && !err
+                  ? <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                  : err ? "!" : i + 1}
               </div>
-              <div className={`flex-1 h-1 ${i === STEPS.length - 1 ? "invisible" : done ? "bg-blue-400" : "bg-slate-200"}`} />
+              <div className={`flex-1 h-1 ${i === STEPS.length - 1 ? "invisible" : done ? "bg-emerald-400" : "bg-slate-200"}`} />
             </div>
             <span className={`text-[10px] mt-1 font-semibold ${
-              isErr ? "text-red-500" : done || active ? "text-blue-600" : "text-slate-400"
-            }`}>{step.label}</span>
+              err ? "text-rose-500" : done || active ? "text-slate-600" : "text-slate-300"
+            }`}>{label}</span>
           </div>
         );
       })}
@@ -61,90 +89,95 @@ function StepBar({ status, error }) {
   );
 }
 
+/* ── File card ───────────────────────────────────────────────────────── */
 function FileCard({ file, onRemove }) {
-  const isProcessed = file.status === "done" && file.result?.status === "processed";
-  const isError = file.status === "error" || file.result?.status === "error";
-  const platform = file.result?.platform;
+  const processed = file.status === "done" && file.result?.status === "processed";
+  const isErr = file.status === "error" || file.result?.status === "error";
+  const isReturn = file.result?.transaction_type === "Return";
+  const cancelled = file.result?.sales_cancelled?.length ?? 0;
 
   return (
     <div className={`rounded-xl border p-4 transition-all ${
-      isProcessed ? "border-emerald-200 bg-emerald-50" :
-      isError ? "border-red-200 bg-red-50" :
-      "border-slate-200 bg-white"
+      processed ? (isReturn ? "border-rose-200 bg-rose-50" : "border-emerald-200 bg-emerald-50")
+      : isErr ? "border-red-200 bg-red-50"
+      : "border-slate-200 bg-white"
     }`}>
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-start gap-3 min-w-0">
-          {/* File icon */}
-          <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
-            isProcessed ? "bg-emerald-100" : isError ? "bg-red-100" : "bg-slate-100"
-          }`}>
-            <svg className={`w-5 h-5 ${isProcessed ? "text-emerald-600" : isError ? "text-red-500" : "text-slate-500"}`}
-              fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
+      <div className="flex items-start gap-3">
+        {/* Icon */}
+        <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
+          processed ? (isReturn ? "bg-rose-100" : "bg-emerald-100")
+          : isErr ? "bg-red-100" : "bg-slate-100"
+        }`}>
+          <svg className={`w-5 h-5 ${processed ? (isReturn ? "text-rose-600" : "text-emerald-600") : isErr ? "text-red-500" : "text-slate-500"}`}
+            fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-sm font-semibold text-slate-800 truncate max-w-[200px]">{file.name}</p>
+            {(file.status === "queued" || isErr) && (
+              <button onClick={() => onRemove(file.id)} className="text-slate-400 hover:text-red-500 p-0.5">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
           </div>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-slate-800 truncate max-w-[220px]">{file.name}</p>
-            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-              {platform && (
-                <span className={`text-xs font-bold px-2 py-0.5 rounded-full text-white ${
-                  platform === "Amazon" ? "bg-blue-600" : platform === "Flipkart" ? "bg-orange-500" : "bg-slate-600"
-                }`}>{platform}</span>
-              )}
-              {isProcessed && (
-                <span className="text-xs font-semibold text-emerald-700">
-                  {file.result.rows_added} row{file.result.rows_added !== 1 ? "s" : ""} extracted
-                </span>
-              )}
-            </div>
+
+          {/* Badges */}
+          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+            {file.result?.platform && (
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-full text-white ${
+                file.result.platform === "Amazon" ? "bg-blue-600"
+                : file.result.platform === "Flipkart" ? "bg-orange-500"
+                : "bg-slate-600"
+              }`}>{file.result.platform}</span>
+            )}
+            {processed && (
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                isReturn ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"
+              }`}>
+                {isReturn ? "↩ Return" : "✓ Sale"} · {file.result.rows_added} row{file.result.rows_added !== 1 ? "s" : ""}
+              </span>
+            )}
+            {cancelled > 0 && (
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                {cancelled} sale{cancelled !== 1 ? "s" : ""} cancelled
+              </span>
+            )}
           </div>
         </div>
-        {(file.status === "queued" || isError) && (
-          <button onClick={() => onRemove(file.id)}
-            className="text-slate-400 hover:text-red-500 transition-colors p-1">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        )}
       </div>
 
-      <StepBar status={file.status} error={isError} />
+      <StepBar status={file.status} />
 
-      {isError && (
+      {isErr && (
         <p className="text-xs text-red-600 mt-2 font-medium">
           {file.error || file.result?.error || "Extraction failed"}
         </p>
-      )}
-
-      {isProcessed && file.result && (
-        <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-          {file.result.rows_added > 0 && (
-            <span className="text-slate-500 col-span-2">
-              Successfully extracted <b className="text-slate-800">{file.result.rows_added} invoice{file.result.rows_added !== 1 ? "s" : ""}</b>
-            </span>
-          )}
-        </div>
       )}
     </div>
   );
 }
 
+/* ── Main page ───────────────────────────────────────────────────────── */
 export default function Upload() {
   const [files, setFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
+  const [transactionType, setTransactionType] = useState("Sale");
 
   const onDrop = useCallback((accepted) => {
-    const newFiles = accepted.map((f) => ({
-      id: Math.random().toString(36).slice(2),
-      name: f.name,
-      file: f,
-      status: "queued",
-      result: null,
-      error: null,
-    }));
-    setFiles((prev) => [...prev, ...newFiles]);
+    setFiles((prev) => [
+      ...prev,
+      ...accepted.map((f) => ({
+        id: Math.random().toString(36).slice(2),
+        name: f.name, file: f,
+        status: "queued", result: null, error: null,
+      })),
+    ]);
   }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -153,7 +186,6 @@ export default function Upload() {
 
   const updateFile = (id, patch) =>
     setFiles((prev) => prev.map((f) => (f.id === id ? { ...f, ...patch } : f)));
-
   const removeFile = (id) =>
     setFiles((prev) => prev.filter((f) => f.id !== id));
 
@@ -164,12 +196,12 @@ export default function Upload() {
 
     for (const f of queued) {
       updateFile(f.id, { status: "uploading" });
-      await new Promise((r) => setTimeout(r, 400));
+      await new Promise((r) => setTimeout(r, 350));
       updateFile(f.id, { status: "extracting" });
-
       try {
         const form = new FormData();
         form.append("files", f.file);
+        form.append("transaction_type", transactionType);
         const { data } = await axios.post("/api/upload", form);
         updateFile(f.id, { status: "done", result: data.results?.[0] });
       } catch (err) {
@@ -182,12 +214,13 @@ export default function Upload() {
     setUploading(false);
   };
 
-  const clearAll = () => !uploading && setFiles([]);
+  const clearAll  = () => !uploading && setFiles([]);
   const clearDone = () => setFiles((prev) => prev.filter((f) => f.status !== "done"));
 
   const queuedCount = files.filter((f) => f.status === "queued").length;
-  const doneCount = files.filter((f) => f.status === "done").length;
-  const totalRows = files.reduce((s, f) => s + (f.result?.rows_added || 0), 0);
+  const doneCount   = files.filter((f) => f.status === "done").length;
+  const totalRows   = files.reduce((s, f) => s + (f.result?.rows_added || 0), 0);
+  const totalCancelled = files.reduce((s, f) => s + (f.result?.sales_cancelled?.length || 0), 0);
 
   return (
     <div className="p-8">
@@ -196,22 +229,25 @@ export default function Upload() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Upload Invoices</h1>
           <p className="text-slate-500 text-sm mt-1">
-            GPT-4o Vision automatically extracts all invoice rows from your documents.
+            GPT-4o Vision reads every row from your invoice. Select the document type before uploading.
           </p>
         </div>
 
-        {/* Platform info banner */}
-        <div className="flex gap-3">
-          <div className="flex-1 flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
-            <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0"></span>
-            <span className="text-sm font-semibold text-blue-700">Amazon</span>
-            <span className="text-xs text-blue-500 font-medium">Auto-detected from document</span>
-          </div>
-          <div className="flex-1 flex items-center gap-3 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3">
-            <span className="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0"></span>
-            <span className="text-sm font-semibold text-orange-700">Flipkart</span>
-            <span className="text-xs text-orange-500 font-medium">Auto-detected from document</span>
-          </div>
+        {/* Type toggle — prominent */}
+        <div className={`rounded-2xl border-2 p-5 transition-colors ${
+          transactionType === "Return"
+            ? "border-rose-300 bg-rose-50"
+            : "border-emerald-300 bg-emerald-50"
+        }`}>
+          <p className="text-sm font-bold text-slate-700 mb-3">Document type</p>
+          <TypeToggle value={transactionType} onChange={setTransactionType} />
+          <p className={`text-xs mt-3 font-medium ${
+            transactionType === "Return" ? "text-rose-600" : "text-emerald-700"
+          }`}>
+            {transactionType === "Return"
+              ? "⚠ Return document — matching sale invoices will be automatically cancelled"
+              : "✓ Sale document — invoices will be added as new sale records"}
+          </p>
         </div>
 
         {/* Drop zone */}
@@ -224,22 +260,22 @@ export default function Upload() {
           }`}
         >
           <input {...getInputProps()} />
-          <div className={`w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center transition-all ${
+          <div className={`w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center ${
             isDragActive ? "bg-blue-100" : "bg-slate-100"
           }`}>
-            <svg className={`w-7 h-7 transition-colors ${isDragActive ? "text-blue-600" : "text-slate-500"}`}
+            <svg className={`w-7 h-7 ${isDragActive ? "text-blue-600" : "text-slate-400"}`}
               fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                 d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
           </div>
-          <p className="font-semibold text-slate-800 text-base">
+          <p className="font-semibold text-slate-800">
             {isDragActive ? "Drop files here" : "Drop invoice files here"}
           </p>
-          <p className="text-slate-400 text-sm mt-1">or click to browse files</p>
-          <div className="flex items-center justify-center gap-2 mt-4">
-            {["PDF", "PNG", "JPG", "TIFF"].map((ext) => (
-              <span key={ext} className="text-xs bg-slate-100 text-slate-500 font-semibold px-2 py-0.5 rounded-md">{ext}</span>
+          <p className="text-slate-400 text-sm mt-1">or click to browse</p>
+          <div className="flex justify-center gap-2 mt-4">
+            {["PDF", "PNG", "JPG", "TIFF"].map((e) => (
+              <span key={e} className="text-xs bg-slate-100 text-slate-500 font-semibold px-2 py-0.5 rounded-md">{e}</span>
             ))}
           </div>
         </div>
@@ -250,61 +286,64 @@ export default function Upload() {
             <button
               onClick={processFiles}
               disabled={uploading || queuedCount === 0}
-              className="btn-primary disabled:opacity-40 disabled:cursor-not-allowed"
+              className={`btn disabled:opacity-40 disabled:cursor-not-allowed text-white shadow-sm ${
+                transactionType === "Return"
+                  ? "bg-rose-600 hover:bg-rose-700"
+                  : "bg-emerald-600 hover:bg-emerald-700"
+              }`}
             >
               {uploading ? (
-                <>
-                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                  Processing…
-                </>
+                <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Processing…</>
               ) : (
-                <>
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                  Process {queuedCount} file{queuedCount !== 1 ? "s" : ""}
-                </>
+                <>{transactionType === "Return" ? "↩" : "✓"} Process {queuedCount} {transactionType}{queuedCount !== 1 ? "s" : ""}</>
               )}
             </button>
-
-            {doneCount > 0 && (
-              <button onClick={clearDone} disabled={uploading} className="btn-secondary">
-                Clear done
-              </button>
-            )}
-            <button onClick={clearAll} disabled={uploading} className="btn-secondary text-red-500 hover:text-red-600">
-              Clear all
-            </button>
-
-            {totalRows > 0 && (
-              <div className="flex items-center gap-1.5 text-sm text-emerald-700 font-semibold">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                {totalRows} row{totalRows !== 1 ? "s" : ""} added
-              </div>
-            )}
+            {doneCount > 0 && <button onClick={clearDone} disabled={uploading} className="btn-secondary">Clear done</button>}
+            <button onClick={clearAll} disabled={uploading} className="btn-secondary text-rose-500 hover:text-rose-600">Clear all</button>
+            <div className="flex items-center gap-3">
+              {totalRows > 0 && (
+                <span className="text-sm font-semibold text-emerald-700">
+                  +{totalRows} row{totalRows !== 1 ? "s" : ""} added
+                </span>
+              )}
+              {totalCancelled > 0 && (
+                <span className="text-sm font-semibold text-amber-700">
+                  {totalCancelled} sale{totalCancelled !== 1 ? "s" : ""} cancelled
+                </span>
+              )}
+            </div>
           </div>
         )}
 
         {/* File cards */}
         {files.length > 0 && (
           <div className="space-y-3">
-            {files.map((f) => (
-              <FileCard key={f.id} file={f} onRemove={removeFile} />
-            ))}
+            {files.map((f) => <FileCard key={f.id} file={f} onRemove={removeFile} />)}
           </div>
         )}
 
-        {/* Empty state hint */}
+        {/* Hint card */}
         {files.length === 0 && (
-          <div className="card-sm bg-slate-50 border-dashed">
-            <h3 className="text-sm font-bold text-slate-700 mb-2">What happens after upload?</h3>
-            <ol className="space-y-1.5 text-xs text-slate-500">
-              <li className="flex items-start gap-2"><span className="w-4 h-4 rounded-full bg-blue-100 text-blue-600 font-bold text-[10px] flex items-center justify-center flex-shrink-0 mt-0.5">1</span> GPT-4o reads every row from your invoice image or PDF</li>
-              <li className="flex items-start gap-2"><span className="w-4 h-4 rounded-full bg-blue-100 text-blue-600 font-bold text-[10px] flex items-center justify-center flex-shrink-0 mt-0.5">2</span> Each row is saved: QTY, PARTY NAME, GST NO, TAXABLE VALUE, CGST/SGST/IGST, STATE</li>
-              <li className="flex items-start gap-2"><span className="w-4 h-4 rounded-full bg-blue-100 text-blue-600 font-bold text-[10px] flex items-center justify-center flex-shrink-0 mt-0.5">3</span> Excel downloads with separate Amazon &amp; Flipkart sheets + totals</li>
-            </ol>
+          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-5">
+            <p className="text-sm font-bold text-slate-700 mb-3">How it works</p>
+            <div className="space-y-2 text-xs text-slate-500">
+              <div className="flex gap-2">
+                <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 font-bold text-[10px] flex items-center justify-center flex-shrink-0">1</span>
+                <span>Select <b>Sale</b> or <b>Return</b> above — applies to all files in this batch</span>
+              </div>
+              <div className="flex gap-2">
+                <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 font-bold text-[10px] flex items-center justify-center flex-shrink-0">2</span>
+                <span>Drop your Amazon or Flipkart invoice image/PDF — GPT-4o reads every row</span>
+              </div>
+              <div className="flex gap-2">
+                <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 font-bold text-[10px] flex items-center justify-center flex-shrink-0">3</span>
+                <span>For <b>Returns</b>: the matching Sale invoice is automatically cancelled by INV NO</span>
+              </div>
+              <div className="flex gap-2">
+                <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 font-bold text-[10px] flex items-center justify-center flex-shrink-0">4</span>
+                <span>Excel downloads with separate Sales, Returns &amp; combined sheets per platform</span>
+              </div>
+            </div>
           </div>
         )}
       </div>
