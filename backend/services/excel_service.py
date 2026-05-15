@@ -6,13 +6,13 @@ from openpyxl.utils import get_column_letter
 
 HEADERS = [
     "QTY", "TYPE", "PARTY NAME", "GST NUMBER", "INV NO", "INV DATE",
-    "TAXABLE VALUE", "CGST9", "SGST9", "IGST18", "PARTY ADDRESS",
+    "TAXABLE VALUE", "CGST9", "SGST9", "IGST18", "TOTAL AMOUNT", "PARTY ADDRESS",
 ]
 FIELDS = [
     "qty", "transaction_type", "party_name", "gst_number", "inv_no", "inv_date",
-    "taxable_value", "cgst9", "sgst9", "igst18", "party_address",
+    "taxable_value", "cgst9", "sgst9", "igst18", "_total_amount", "party_address",
 ]
-NUM_COLS = {7, 8, 9, 10}   # 1-indexed: TAXABLE VALUE, CGST9, SGST9, IGST18
+NUM_COLS = {7, 8, 9, 10, 11}   # 1-indexed: TAXABLE VALUE, CGST9, SGST9, IGST18, TOTAL AMOUNT
 
 TITLE_FONT   = Font(bold=True, size=13)
 HEADER_FONT  = Font(bold=True, size=11)
@@ -24,7 +24,7 @@ TOTAL_FONT   = Font(bold=True, size=11)
 TOTAL_FILL   = PatternFill("solid", fgColor="FFF2CC")
 THIN         = Side(style="thin", color="BFBFBF")
 BORDER       = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
-COL_WIDTHS   = [6, 10, 28, 18, 28, 12, 16, 12, 12, 12, 22]
+COL_WIDTHS   = [6, 10, 28, 18, 28, 12, 16, 12, 12, 12, 16, 22]
 
 AMAZON_WAREHOUSES   = ["IN", "MAA4", "CJB1"]
 WAREHOUSE_LABELS    = {"IN": "IN (India)", "MAA4": "MAA4 (Chennai)", "CJB1": "CJB1 (Coimbatore)"}
@@ -58,7 +58,14 @@ def _write_sheet(ws, invoices, title: str):
         row_fill  = RETURN_FILL if is_return else SALE_FILL
 
         for col_idx, field in enumerate(FIELDS, start=1):
-            val  = getattr(inv, field, None)
+            if field == "_total_amount":
+                tv = getattr(inv, "taxable_value", None) or 0
+                cg = getattr(inv, "cgst9", None) or 0
+                sg = getattr(inv, "sgst9", None) or 0
+                ig = getattr(inv, "igst18", None) or 0
+                val = tv + cg + sg + ig if (tv or cg or sg or ig) else None
+            else:
+                val = getattr(inv, field, None)
             cell = ws.cell(row=row_idx, column=col_idx, value=val)
             if not is_cancel:
                 cell.fill = row_fill

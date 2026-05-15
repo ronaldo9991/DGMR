@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from "react";
 import axios from "axios";
 import PlatformTabs from "../components/PlatformTabs.jsx";
 
-const AMT_KEYS = new Set(["taxable_value", "cgst9", "sgst9", "igst18"]);
+const AMT_KEYS = new Set(["taxable_value", "cgst9", "sgst9", "igst18", "total_amount"]);
 const INR = (v) =>
   v != null ? `₹${Number(v).toLocaleString("en-IN", { minimumFractionDigits: 2 })}` : "—";
 
@@ -27,6 +27,7 @@ const COLS = [
   { key: "cgst9",           label: "CGST9"         },
   { key: "sgst9",           label: "SGST9"         },
   { key: "igst18",          label: "IGST18"        },
+  { key: "total_amount",    label: "Total (₹)"     },
   { key: "party_address",   label: "State"         },
 ];
 
@@ -264,12 +265,13 @@ export default function Records() {
       {records.length > 0 && (
         <div className="space-y-2">
           {/* Net totals row */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             {[
-              { label: "Net Taxable",  value: INR(totals.taxable_value), cls: "text-slate-900" },
-              { label: "CGST + SGST (Net)", value: INR(totals.cgst9 + totals.sgst9), cls: "text-blue-700" },
-              { label: "IGST (Net)",   value: INR(totals.igst18), cls: "text-orange-700" },
-              { label: "Net Total",    value: INR(grandTotal),    cls: "text-emerald-700 text-base font-extrabold" },
+              { label: "Net Taxable",       value: INR(totals.taxable_value),          cls: "text-slate-900" },
+              { label: "CGST + SGST (Net)", value: INR(totals.cgst9 + totals.sgst9),   cls: "text-blue-700" },
+              { label: "IGST (Net)",        value: INR(totals.igst18),                 cls: "text-orange-700" },
+              { label: "Net Total Amount",  value: INR(grandTotal),                    cls: "text-emerald-700 font-extrabold" },
+              { label: "Grand Total (All)", value: INR(salesTotals.taxable_value + salesTotals.cgst9 + salesTotals.sgst9 + salesTotals.igst18), cls: "text-slate-700 font-extrabold" },
             ].map((s) => (
               <div key={s.label} className="card-sm text-center">
                 <p className="text-xs text-slate-500 font-semibold">{s.label}</p>
@@ -351,6 +353,10 @@ export default function Records() {
                         />
                       ) : c.key === "party_name" ? (
                         <span className="font-medium text-slate-800">{rec.party_name || "—"}</span>
+                      ) : c.key === "total_amount" ? (
+                        <span className="font-bold text-slate-900">
+                          {INR((rec.taxable_value || 0) + (rec.cgst9 || 0) + (rec.sgst9 || 0) + (rec.igst18 || 0))}
+                        </span>
                       ) : AMT_KEYS.has(c.key) ? (
                         INR(rec[c.key])
                       ) : (
@@ -378,6 +384,9 @@ export default function Records() {
                 <td className="text-right px-4 py-1 text-emerald-700">{INR(salesTotals.cgst9)}</td>
                 <td className="text-right px-4 py-1 text-emerald-700">{INR(salesTotals.sgst9)}</td>
                 <td className="text-right px-4 py-1 text-emerald-700">{INR(salesTotals.igst18)}</td>
+                <td className="text-right px-4 py-1 text-emerald-700 font-bold">
+                  {INR(salesTotals.taxable_value + salesTotals.cgst9 + salesTotals.sgst9 + salesTotals.igst18)}
+                </td>
                 <td colSpan={2} />
               </tr>
               <tr className="text-xs text-slate-400 font-medium">
@@ -386,6 +395,9 @@ export default function Records() {
                 <td className="text-right px-4 py-1 text-rose-600">−{INR(returnTotals.cgst9)}</td>
                 <td className="text-right px-4 py-1 text-rose-600">−{INR(returnTotals.sgst9)}</td>
                 <td className="text-right px-4 py-1 text-rose-600">−{INR(returnTotals.igst18)}</td>
+                <td className="text-right px-4 py-1 text-rose-600 font-bold">
+                  −{INR(returnTotals.taxable_value + returnTotals.cgst9 + returnTotals.sgst9 + returnTotals.igst18)}
+                </td>
                 <td colSpan={2} />
               </tr>
               <tr className="border-t-2 border-slate-300">
@@ -394,6 +406,7 @@ export default function Records() {
                 <td className="text-right font-bold">{INR(totals.cgst9)}</td>
                 <td className="text-right font-bold">{INR(totals.sgst9)}</td>
                 <td className="text-right font-bold">{INR(totals.igst18)}</td>
+                <td className="text-right font-bold text-emerald-700">{INR(grandTotal)}</td>
                 <td colSpan={2} />
               </tr>
             </tfoot>
