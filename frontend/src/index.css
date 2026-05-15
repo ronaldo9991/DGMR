@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gray-50 text-gray-900 font-sans;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-white rounded-xl shadow-sm border border-gray-100 p-6;
+  }
+  .btn-primary {
+    @apply inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white font-medium px-4 py-2 rounded-lg transition-colors;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-700 font-medium px-4 py-2 rounded-lg border border-gray-200 transition-colors;
+  }
+  .badge-sale {
+    @apply inline-block bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full;
+  }
+  .badge-return {
+    @apply inline-block bg-orange-100 text-orange-700 text-xs font-semibold px-2 py-0.5 rounded-full;
+  }
+  .badge-paid {
+    @apply inline-block bg-emerald-100 text-emerald-700 text-xs font-semibold px-2 py-0.5 rounded-full;
+  }
+  .badge-pending {
+    @apply inline-block bg-yellow-100 text-yellow-700 text-xs font-semibold px-2 py-0.5 rounded-full;
+  }
+  .badge-partial {
+    @apply inline-block bg-blue-100 text-blue-700 text-xs font-semibold px-2 py-0.5 rounded-full;
+  }
+}
