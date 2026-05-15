@@ -194,23 +194,31 @@ export default function Upload() {
     if (!queued.length) return;
     setUploading(true);
 
-    for (const f of queued) {
-      updateFile(f.id, { status: "uploading" });
-      await new Promise((r) => setTimeout(r, 350));
-      updateFile(f.id, { status: "extracting" });
-      try {
-        const form = new FormData();
-        form.append("files", f.file);
-        form.append("transaction_type", transactionType);
-        const { data } = await axios.post("/api/upload", form);
-        updateFile(f.id, { status: "done", result: data.results?.[0] });
-      } catch (err) {
-        updateFile(f.id, {
-          status: "error",
-          error: err.response?.data?.detail || err.message || "Upload failed",
-        });
-      }
+    // Mark every queued file as uploading simultaneously
+    queued.forEach((f) => updateFile(f.id, { status: "uploading" }));
+    await new Promise((r) => setTimeout(r, 300));
+
+    // Mark every queued file as extracting simultaneously
+    queued.forEach((f) => updateFile(f.id, { status: "extracting" }));
+
+    // Send ALL files in ONE request — backend OCRs them in parallel
+    try {
+      const form = new FormData();
+      queued.forEach((f) => form.append("files", f.file));
+      form.append("transaction_type", transactionType);
+
+      const { data } = await axios.post("/api/upload", form);
+
+      // Results come back in the same order files were appended
+      queued.forEach((f, idx) => {
+        const result = data.results?.[idx] ?? { status: "error", error: "No result returned" };
+        updateFile(f.id, { status: "done", result });
+      });
+    } catch (err) {
+      const msg = err.response?.data?.detail || err.message || "Upload failed";
+      queued.forEach((f) => updateFile(f.id, { status: "error", error: msg }));
     }
+
     setUploading(false);
   };
 
@@ -269,11 +277,13 @@ export default function Upload() {
                 d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
           </div>
-          <p className="font-semibold text-slate-800">
-            {isDragActive ? "Drop files here" : "Drop invoice files here"}
+          <p className="font-semibold text-slate-800 text-base">
+            {isDragActive ? "Drop files here" : "Drop multiple invoice files"}
           </p>
-          <p className="text-slate-400 text-sm mt-1">or click to browse</p>
-          <div className="flex justify-center gap-2 mt-4">
+          <p className="text-slate-400 text-sm mt-1">
+            or click to browse — <span className="font-semibold text-slate-500">select 5 or more at once</span>
+          </p>
+          <div className="flex justify-center gap-2 mt-4 flex-wrap">
             {["PDF", "PNG", "JPG", "TIFF"].map((e) => (
               <span key={e} className="text-xs bg-slate-100 text-slate-500 font-semibold px-2 py-0.5 rounded-md">{e}</span>
             ))}
@@ -315,9 +325,35 @@ export default function Upload() {
           </div>
         )}
 
-        {/* File cards */}
+        {/* File queue summary */}
         {files.length > 0 && (
           <div className="space-y-3">
+            <div className="flex items-center gap-3 flex-wrap text-xs font-semibold text-slate-500">
+              {queuedCount > 0 && (
+                <span className="flex items-center gap-1.5 bg-slate-100 px-2.5 py-1 rounded-full">
+                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                  {queuedCount} queued
+                </span>
+              )}
+              {files.filter((f) => f.status === "extracting" || f.status === "uploading").length > 0 && (
+                <span className="flex items-center gap-1.5 bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                  {files.filter((f) => f.status === "extracting" || f.status === "uploading").length} processing
+                </span>
+              )}
+              {doneCount > 0 && (
+                <span className="flex items-center gap-1.5 bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                  {doneCount} done
+                </span>
+              )}
+              {files.filter((f) => f.status === "error").length > 0 && (
+                <span className="flex items-center gap-1.5 bg-red-100 text-red-600 px-2.5 py-1 rounded-full">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                  {files.filter((f) => f.status === "error").length} failed
+                </span>
+              )}
+            </div>
             {files.map((f) => <FileCard key={f.id} file={f} onRemove={removeFile} />)}
           </div>
         )}
