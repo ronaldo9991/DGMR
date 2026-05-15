@@ -19,9 +19,15 @@ MAX_FILE_SIZE = 20 * 1024 * 1024  # 20 MB
 _ocr_pool = ThreadPoolExecutor(max_workers=10)
 
 
+def _normalize_inv(inv_no: str) -> str:
+    return inv_no.strip().upper().replace(" ", "").replace("-", "")
+
+
 def _cancel_matching_sale(db: Session, inv_no: str, platform: Optional[str]) -> Optional[int]:
     if not inv_no:
         return None
+
+    # Exact match first (fastest)
     q = db.query(Invoice).filter(
         Invoice.inv_no == inv_no,
         Invoice.transaction_type == "Sale",
@@ -31,6 +37,22 @@ def _cancel_matching_sale(db: Session, inv_no: str, platform: Optional[str]) -> 
     if platform:
         q = q.filter(Invoice.platform == platform)
     sale = q.first()
+
+    # Fallback: normalized match (handles OCR whitespace/case/hyphen differences)
+    if not sale:
+        normalized = _normalize_inv(inv_no)
+        candidates = db.query(Invoice).filter(
+            Invoice.transaction_type == "Sale",
+            Invoice.cancelled == False,
+            Invoice.status == "processed",
+        )
+        if platform:
+            candidates = candidates.filter(Invoice.platform == platform)
+        for candidate in candidates.all():
+            if candidate.inv_no and _normalize_inv(candidate.inv_no) == normalized:
+                sale = candidate
+                break
+
     if sale:
         sale.cancelled = True
         return sale.id
@@ -97,6 +119,7 @@ async def upload_documents(
 
             db.add(Invoice(
                 platform=row.platform,
+                warehouse=row.warehouse,
                 transaction_type=transaction_type,
                 qty=row.qty,
                 party_name=row.party_name,

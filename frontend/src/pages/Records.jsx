@@ -6,8 +6,17 @@ const AMT_KEYS = new Set(["taxable_value", "cgst9", "sgst9", "igst18"]);
 const INR = (v) =>
   v != null ? `₹${Number(v).toLocaleString("en-IN", { minimumFractionDigits: 2 })}` : "—";
 
+const AMAZON_WAREHOUSES = ["IN", "MAA4", "CJB1"];
+const WH_LABELS = { IN: "IN (India)", MAA4: "MAA4 (Chennai)", CJB1: "CJB1 (Coimbatore)" };
+const WH_COLORS = {
+  IN:   "bg-sky-100 text-sky-700",
+  MAA4: "bg-violet-100 text-violet-700",
+  CJB1: "bg-teal-100 text-teal-700",
+};
+
 const COLS = [
   { key: "platform",        label: "Platform"      },
+  { key: "warehouse",       label: "Warehouse"     },
   { key: "transaction_type",label: "Type"          },
   { key: "qty",             label: "QTY"           },
   { key: "party_name",      label: "Party Name"    },
@@ -29,6 +38,15 @@ function PlatformBadge({ platform }) {
     Other:    "bg-purple-100 text-purple-700",
   };
   return <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${s[platform] || "bg-slate-100 text-slate-600"}`}>{platform}</span>;
+}
+
+function WarehouseBadge({ warehouse }) {
+  if (!warehouse) return <span className="text-slate-300 text-xs">—</span>;
+  return (
+    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${WH_COLORS[warehouse] || "bg-slate-100 text-slate-600"}`}>
+      {warehouse}
+    </span>
+  );
 }
 
 function TypeBadge({ type, cancelled, linkedSaleId }) {
@@ -68,7 +86,8 @@ export default function Records() {
   const [loading,        setLoading]        = useState(true);
   const [search,         setSearch]         = useState("");
   const [activePlatform, setActivePlatform] = useState("All");
-  const [typeFilter,     setTypeFilter]     = useState("All");   // All | Sale | Return
+  const [activeWarehouse,setActiveWarehouse]= useState("All");  // All | IN | MAA4 | CJB1
+  const [typeFilter,     setTypeFilter]     = useState("All");  // All | Sale | Return
   const [showCancelled,  setShowCancelled]  = useState(false);
   const [deleting,       setDeleting]       = useState(null);
 
@@ -76,6 +95,7 @@ export default function Records() {
     setLoading(true);
     const p = new URLSearchParams({ limit: "500" });
     if (activePlatform !== "All") p.set("platform", activePlatform);
+    if (activePlatform === "Amazon" && activeWarehouse !== "All") p.set("warehouse", activeWarehouse);
     if (typeFilter !== "All")     p.set("transaction_type", typeFilter);
     if (search)                   p.set("search", search);
     if (!showCancelled)           p.set("cancelled", "false");
@@ -84,7 +104,7 @@ export default function Records() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, [activePlatform, typeFilter, search, showCancelled]);
+  useEffect(() => { load(); }, [activePlatform, activeWarehouse, typeFilter, search, showCancelled]);
 
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this record?")) return;
@@ -107,8 +127,11 @@ export default function Records() {
     return c;
   }, [allForCount]);
 
-  const totals = useMemo(() =>
-    records.filter((r) => !r.cancelled).reduce(
+  const salesRows  = records.filter((r) => !r.cancelled && r.transaction_type === "Sale");
+  const returnRows = records.filter((r) => !r.cancelled && r.transaction_type === "Return");
+
+  const sumRows = (rows) =>
+    rows.reduce(
       (acc, r) => ({
         taxable_value: acc.taxable_value + (r.taxable_value || 0),
         cgst9:  acc.cgst9  + (r.cgst9  || 0),
@@ -116,12 +139,20 @@ export default function Records() {
         igst18: acc.igst18 + (r.igst18 || 0),
       }),
       { taxable_value: 0, cgst9: 0, sgst9: 0, igst18: 0 }
-    ),
-  [records]);
+    );
+
+  const salesTotals   = useMemo(() => sumRows(salesRows),  [salesRows]);
+  const returnTotals  = useMemo(() => sumRows(returnRows), [returnRows]);
+
+  // Net = Sales minus Returns
+  const totals = useMemo(() => ({
+    taxable_value: salesTotals.taxable_value - returnTotals.taxable_value,
+    cgst9:  salesTotals.cgst9  - returnTotals.cgst9,
+    sgst9:  salesTotals.sgst9  - returnTotals.sgst9,
+    igst18: salesTotals.igst18 - returnTotals.igst18,
+  }), [salesTotals, returnTotals]);
 
   const grandTotal = totals.taxable_value + totals.cgst9 + totals.sgst9 + totals.igst18;
-  const salesRows  = records.filter((r) => !r.cancelled && r.transaction_type === "Sale");
-  const returnRows = records.filter((r) => !r.cancelled && r.transaction_type === "Return");
 
   return (
     <div className="p-8 space-y-6">
@@ -145,7 +176,39 @@ export default function Records() {
       </div>
 
       {/* Platform tabs */}
-      <PlatformTabs active={activePlatform} onChange={setActivePlatform} counts={tabCounts} />
+      <PlatformTabs active={activePlatform} onChange={(p) => { setActivePlatform(p); setActiveWarehouse("All"); }} counts={tabCounts} />
+
+      {/* Amazon warehouse tabs */}
+      {activePlatform === "Amazon" && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Warehouse</span>
+          {["All", ...AMAZON_WAREHOUSES].map((wh) => (
+            <button
+              key={wh}
+              onClick={() => setActiveWarehouse(wh)}
+              className={`text-xs font-bold px-3 py-1 rounded-full border transition-all ${
+                activeWarehouse === wh
+                  ? wh === "All"
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : `border-transparent text-white ${wh === "IN" ? "bg-sky-600" : wh === "MAA4" ? "bg-violet-600" : "bg-teal-600"}`
+                  : "bg-white border-slate-200 text-slate-500 hover:border-blue-300"
+              }`}
+            >
+              {wh === "All" ? "All Warehouses" : `${wh} — ${wh === "IN" ? "India" : wh === "MAA4" ? "Chennai" : "Coimbatore"}`}
+            </button>
+          ))}
+          {/* Per-warehouse download */}
+          {activeWarehouse !== "All" && (
+            <a
+              href={`/api/excel?platform=Amazon&warehouse=${activeWarehouse}`}
+              download
+              className="ml-2 text-xs font-semibold px-3 py-1 rounded-full border border-blue-300 text-blue-700 hover:bg-blue-50 transition-colors"
+            >
+              ⬇ Download {activeWarehouse} Excel
+            </a>
+          )}
+        </div>
+      )}
 
       {/* Type filter + search */}
       <div className="flex flex-wrap items-center gap-3">
@@ -192,24 +255,54 @@ export default function Records() {
 
       {/* Summary strip */}
       {records.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { label: "Taxable Total", value: INR(totals.taxable_value), cls: "text-slate-900" },
-            { label: "CGST + SGST",   value: INR(totals.cgst9 + totals.sgst9),  cls: "text-blue-700" },
-            { label: "IGST Total",    value: INR(totals.igst18), cls: "text-orange-700" },
-            { label: "Grand Total",   value: INR(grandTotal),   cls: "text-emerald-700 text-base font-extrabold" },
-          ].map((s) => (
-            <div key={s.label} className="card-sm text-center">
-              <p className="text-xs text-slate-500 font-semibold">{s.label}</p>
-              <p className={`font-bold mt-1 tabular-nums text-sm ${s.cls}`}>{s.value}</p>
+        <div className="space-y-2">
+          {/* Net totals row */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { label: "Net Taxable",  value: INR(totals.taxable_value), cls: "text-slate-900" },
+              { label: "CGST + SGST (Net)", value: INR(totals.cgst9 + totals.sgst9), cls: "text-blue-700" },
+              { label: "IGST (Net)",   value: INR(totals.igst18), cls: "text-orange-700" },
+              { label: "Net Total",    value: INR(grandTotal),    cls: "text-emerald-700 text-base font-extrabold" },
+            ].map((s) => (
+              <div key={s.label} className="card-sm text-center">
+                <p className="text-xs text-slate-500 font-semibold">{s.label}</p>
+                <p className={`font-bold mt-1 tabular-nums text-sm ${s.cls}`}>{s.value}</p>
+              </div>
+            ))}
+          </div>
+          {/* Sales vs Returns breakdown */}
+          {(salesRows.length > 0 || returnRows.length > 0) && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-emerald-700">Sales ({salesRows.length})</p>
+                  <p className="text-sm font-bold text-emerald-800 tabular-nums mt-0.5">
+                    {INR(salesTotals.taxable_value + salesTotals.cgst9 + salesTotals.sgst9 + salesTotals.igst18)}
+                  </p>
+                </div>
+                <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+              </div>
+              <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-rose-700">Returns ({returnRows.length})</p>
+                  <p className="text-sm font-bold text-rose-800 tabular-nums mt-0.5">
+                    {INR(returnTotals.taxable_value + returnTotals.cgst9 + returnTotals.sgst9 + returnTotals.igst18)}
+                  </p>
+                </div>
+                <svg className="w-5 h-5 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                </svg>
+              </div>
             </div>
-          ))}
+          )}
         </div>
       )}
 
       {/* Table */}
       <div className="card overflow-x-auto p-0 rounded-2xl">
-        <table className="data-table min-w-[1100px]">
+        <table className="data-table min-w-[1250px]">
           <thead>
             <tr>
               {COLS.map((c) => (
@@ -240,6 +333,8 @@ export default function Records() {
                     <td key={c.key} className={AMT_KEYS.has(c.key) ? "num" : ""}>
                       {c.key === "platform" ? (
                         <PlatformBadge platform={rec.platform} />
+                      ) : c.key === "warehouse" ? (
+                        <WarehouseBadge warehouse={rec.warehouse} />
                       ) : c.key === "transaction_type" ? (
                         <TypeBadge
                           type={rec.transaction_type}
@@ -269,14 +364,28 @@ export default function Records() {
           </tbody>
           {records.length > 0 && (
             <tfoot>
-              <tr>
-                <td colSpan={7} className="text-slate-700">
-                  TOTAL — {records.filter((r) => !r.cancelled).length} active rows
-                </td>
-                <td className="text-right">{INR(totals.taxable_value)}</td>
-                <td className="text-right">{INR(totals.cgst9)}</td>
-                <td className="text-right">{INR(totals.sgst9)}</td>
-                <td className="text-right">{INR(totals.igst18)}</td>
+              <tr className="text-xs text-slate-400 font-medium">
+                <td colSpan={8} className="px-4 py-1">Sales ({salesRows.length})</td>
+                <td className="text-right px-4 py-1 text-emerald-700">{INR(salesTotals.taxable_value)}</td>
+                <td className="text-right px-4 py-1 text-emerald-700">{INR(salesTotals.cgst9)}</td>
+                <td className="text-right px-4 py-1 text-emerald-700">{INR(salesTotals.sgst9)}</td>
+                <td className="text-right px-4 py-1 text-emerald-700">{INR(salesTotals.igst18)}</td>
+                <td colSpan={2} />
+              </tr>
+              <tr className="text-xs text-slate-400 font-medium">
+                <td colSpan={8} className="px-4 py-1">Returns ({returnRows.length})</td>
+                <td className="text-right px-4 py-1 text-rose-600">−{INR(returnTotals.taxable_value)}</td>
+                <td className="text-right px-4 py-1 text-rose-600">−{INR(returnTotals.cgst9)}</td>
+                <td className="text-right px-4 py-1 text-rose-600">−{INR(returnTotals.sgst9)}</td>
+                <td className="text-right px-4 py-1 text-rose-600">−{INR(returnTotals.igst18)}</td>
+                <td colSpan={2} />
+              </tr>
+              <tr className="border-t-2 border-slate-300">
+                <td colSpan={8} className="text-slate-800 font-bold">NET TOTAL</td>
+                <td className="text-right font-bold">{INR(totals.taxable_value)}</td>
+                <td className="text-right font-bold">{INR(totals.cgst9)}</td>
+                <td className="text-right font-bold">{INR(totals.sgst9)}</td>
+                <td className="text-right font-bold">{INR(totals.igst18)}</td>
                 <td colSpan={2} />
               </tr>
             </tfoot>

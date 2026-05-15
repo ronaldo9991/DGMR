@@ -12,6 +12,7 @@ def _serialize(inv) -> dict:
     return {
         "id": inv.id,
         "platform": inv.platform,
+        "warehouse": inv.warehouse,
         "transaction_type": inv.transaction_type,
         "qty": inv.qty,
         "party_name": inv.party_name,
@@ -36,6 +37,7 @@ def list_records(
     skip: int = 0,
     limit: int = 500,
     platform: Optional[str] = None,
+    warehouse: Optional[str] = None,
     transaction_type: Optional[str] = None,
     cancelled: Optional[bool] = None,
     search: Optional[str] = None,
@@ -44,6 +46,8 @@ def list_records(
     q = db.query(Invoice).filter(Invoice.status == "processed")
     if platform:
         q = q.filter(Invoice.platform == platform)
+    if warehouse:
+        q = q.filter(Invoice.warehouse == warehouse)
     if transaction_type:
         q = q.filter(Invoice.transaction_type == transaction_type)
     if cancelled is not None:
@@ -57,7 +61,7 @@ def list_records(
             | Invoice.party_address.ilike(like)
         )
     total = q.count()
-    rows = q.order_by(Invoice.created_at.desc(), Invoice.id).offset(skip).limit(limit).all()
+    rows = q.order_by(Invoice.inv_no.asc(), Invoice.id).offset(skip).limit(limit).all()
     return {"total": total, "records": [_serialize(r) for r in rows]}
 
 

@@ -25,6 +25,9 @@ class Invoice(Base):
     # Return linkage: if this is a Return, stores the ID of the Sale it cancels
     linked_sale_id = Column(Integer, nullable=True)
 
+    # Amazon warehouse: IN | MAA4 | CJB1 (null for Flipkart/Other)
+    warehouse = Column(String, nullable=True)
+
     # Meta
     document_file = Column(String, nullable=True)
     status = Column(String, default="processed")       # processed | error
