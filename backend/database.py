@@ -11,10 +11,14 @@ if DATABASE_URL:
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
     engine = create_engine(DATABASE_URL)
 else:
-    # Local dev: SQLite
-    DB_PATH = os.path.join(os.path.dirname(__file__), "..", "dgmr.db")
+    # Local dev / Railway volume: SQLite (DB_PATH env or default)
+    db_path = os.getenv(
+        "DB_PATH",
+        os.path.join(os.path.dirname(__file__), "..", "dgmr.db"),
+    )
+    os.makedirs(os.path.dirname(os.path.abspath(db_path)), exist_ok=True)
     engine = create_engine(
-        f"sqlite:///{os.path.abspath(DB_PATH)}",
+        f"sqlite:///{os.path.abspath(db_path)}",
         connect_args={"check_same_thread": False},
     )
 

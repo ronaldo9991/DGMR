@@ -29,16 +29,6 @@ app.include_router(excel.router, prefix="/api")
 app.include_router(stats.router, prefix="/api")
 
 
-@app.get("/")
-def root():
-    return {
-        "service": "DGMR TECH OCR Dashboard API",
-        "status": "ok",
-        "docs": "/docs",
-        "health": "/api/health",
-    }
-
-
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
@@ -46,9 +36,29 @@ def health():
 
 # Serve React SPA — must come AFTER API routes
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+INDEX_HTML = os.path.join(STATIC_DIR, "index.html")
+
+
+def _serve_index():
+    return FileResponse(INDEX_HTML)
+
+
 if os.path.exists(STATIC_DIR):
     app.mount("/assets", StaticFiles(directory=os.path.join(STATIC_DIR, "assets")), name="assets")
 
+    @app.get("/")
+    def serve_root():
+        return _serve_index()
+
     @app.get("/{full_path:path}")
     def serve_spa(full_path: str):
-        return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+        return _serve_index()
+else:
+    @app.get("/")
+    def root():
+        return {
+            "service": "DGMR TECH OCR Dashboard API",
+            "status": "ok",
+            "docs": "/docs",
+            "health": "/api/health",
+        }
