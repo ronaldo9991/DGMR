@@ -4,33 +4,100 @@
 
 @layer base {
   body {
-    @apply bg-gray-50 text-gray-900 font-sans;
+    @apply bg-slate-50 text-slate-900 antialiased;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   }
 }
 
 @layer components {
+  /* Cards */
   .card {
-    @apply bg-white rounded-xl shadow-sm border border-gray-100 p-6;
+    @apply bg-white rounded-2xl shadow-sm border border-slate-100 p-6;
+  }
+  .card-sm {
+    @apply bg-white rounded-xl shadow-sm border border-slate-100 p-4;
+  }
+
+  /* Buttons */
+  .btn {
+    @apply inline-flex items-center gap-2 font-semibold px-4 py-2 rounded-xl transition-all duration-150 text-sm;
   }
   .btn-primary {
-    @apply inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white font-medium px-4 py-2 rounded-lg transition-colors;
+    @apply btn bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow;
   }
   .btn-secondary {
-    @apply inline-flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-700 font-medium px-4 py-2 rounded-lg border border-gray-200 transition-colors;
+    @apply btn bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 hover:border-slate-300;
   }
-  .badge-sale {
-    @apply inline-block bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full;
+  .btn-orange {
+    @apply btn bg-orange-500 hover:bg-orange-600 text-white shadow-sm;
   }
-  .badge-return {
-    @apply inline-block bg-orange-100 text-orange-700 text-xs font-semibold px-2 py-0.5 rounded-full;
+  .btn-danger {
+    @apply btn bg-red-50 hover:bg-red-100 text-red-600 border border-red-200;
   }
-  .badge-paid {
-    @apply inline-block bg-emerald-100 text-emerald-700 text-xs font-semibold px-2 py-0.5 rounded-full;
+
+  /* Platform badges */
+  .badge {
+    @apply inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full;
   }
-  .badge-pending {
-    @apply inline-block bg-yellow-100 text-yellow-700 text-xs font-semibold px-2 py-0.5 rounded-full;
+  .badge-amazon {
+    @apply badge bg-blue-100 text-blue-700;
   }
-  .badge-partial {
-    @apply inline-block bg-blue-100 text-blue-700 text-xs font-semibold px-2 py-0.5 rounded-full;
+  .badge-flipkart {
+    @apply badge bg-orange-100 text-orange-700;
+  }
+  .badge-other {
+    @apply badge bg-purple-100 text-purple-700;
+  }
+  .badge-success {
+    @apply badge bg-emerald-100 text-emerald-700;
+  }
+  .badge-error {
+    @apply badge bg-red-100 text-red-600;
+  }
+  .badge-cancel {
+    @apply badge bg-red-100 text-red-600;
+  }
+
+  /* Tab system */
+  .tab-bar {
+    @apply flex gap-1 bg-slate-100 rounded-xl p-1;
+  }
+  .tab {
+    @apply flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all;
+  }
+  .tab-active {
+    @apply bg-white text-slate-900 shadow-sm;
+  }
+  .tab-inactive {
+    @apply text-slate-500 hover:text-slate-700 hover:bg-white/60;
+  }
+
+  /* Table */
+  .data-table {
+    @apply w-full text-sm;
+  }
+  .data-table thead tr {
+    @apply bg-slate-50 border-b-2 border-slate-200;
+  }
+  .data-table thead th {
+    @apply px-3 py-3 font-bold text-slate-600 whitespace-nowrap text-left;
+  }
+  .data-table thead th.num {
+    @apply text-right;
+  }
+  .data-table tbody tr {
+    @apply border-b border-slate-100 hover:bg-slate-50 transition-colors;
+  }
+  .data-table tbody td {
+    @apply px-3 py-2.5 text-slate-700;
+  }
+  .data-table tbody td.num {
+    @apply text-right tabular-nums font-medium;
+  }
+  .data-table tfoot tr {
+    @apply bg-amber-50 border-t-2 border-amber-200;
+  }
+  .data-table tfoot td {
+    @apply px-3 py-3 font-bold tabular-nums;
   }
 }
