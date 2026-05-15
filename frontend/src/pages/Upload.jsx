@@ -264,22 +264,17 @@ export default function Upload() {
     if (!queued.length) return;
     setUploading(true);
 
-    // Mark every queued file as uploading simultaneously
     queued.forEach((f) => updateFile(f.id, { status: "uploading" }));
     await new Promise((r) => setTimeout(r, 300));
-
-    // Mark every queued file as extracting simultaneously
     queued.forEach((f) => updateFile(f.id, { status: "extracting" }));
 
-    // Send ALL files in ONE request — backend OCRs them in parallel
     try {
       const form = new FormData();
       queued.forEach((f) => form.append("files", f.file));
       form.append("transaction_type", transactionType);
 
-      const { data } = await axios.post("/api/upload", form);
+      const { data } = await axios.post("/api/upload", form, { timeout: 180_000 });
 
-      // Results come back in the same order files were appended
       queued.forEach((f, idx) => {
         const result = data.results?.[idx] ?? { status: "error", error: "No result returned" };
         updateFile(f.id, { status: "done", result });
@@ -375,7 +370,7 @@ export default function Upload() {
               {uploading ? (
                 <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Processing…</>
               ) : (
-                <>{transactionType === "Return" ? "↩" : "✓"} Process {queuedCount} {transactionType}{queuedCount !== 1 ? "s" : ""}</>
+                <>{transactionType === "Return" ? "↩" : "✓"} Process {queuedCount} file{queuedCount !== 1 ? "s" : ""}</>
               )}
             </button>
             {doneCount > 0 && <button onClick={clearDone} disabled={uploading} className="btn-secondary">Clear done</button>}

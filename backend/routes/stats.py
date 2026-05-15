@@ -1,3 +1,4 @@
+import re
 from collections import defaultdict
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -6,6 +7,47 @@ from database import get_db
 from models import Invoice
 
 router = APIRouter()
+
+# Canonical Indian state/UT names (lowercase for matching)
+_STATES = [
+    "andhra pradesh", "arunachal pradesh", "assam", "bihar", "chhattisgarh",
+    "goa", "gujarat", "haryana", "himachal pradesh", "jharkhand", "karnataka",
+    "kerala", "madhya pradesh", "maharashtra", "manipur", "meghalaya",
+    "mizoram", "nagaland", "odisha", "orissa", "punjab", "rajasthan",
+    "sikkim", "tamil nadu", "telangana", "tripura", "uttar pradesh",
+    "uttarakhand", "uttaranchal", "west bengal",
+    "andaman and nicobar", "chandigarh", "dadra and nagar haveli",
+    "daman and diu", "delhi", "jammu and kashmir", "ladakh",
+    "lakshadweep", "puducherry", "pondicherry",
+]
+# Sort longest-first so "Tamil Nadu" matches before "Nadu"
+_STATES_SORTED = sorted(_STATES, key=len, reverse=True)
+
+# Canonical display names
+_CANONICAL = {
+    "orissa": "Odisha",
+    "uttaranchal": "Uttarakhand",
+    "pondicherry": "Puducherry",
+    "andaman and nicobar": "Andaman & Nicobar",
+    "dadra and nagar haveli": "Dadra & Nagar Haveli",
+    "daman and diu": "Daman & Diu",
+    "jammu and kashmir": "Jammu & Kashmir",
+}
+
+
+def _extract_state(address: str) -> str:
+    if not address:
+        return "Unknown"
+    # Remove PIN codes and noise
+    clean = re.sub(r"\b\d{6}\b", "", address)
+    lower = clean.lower()
+    for s in _STATES_SORTED:
+        if s in lower:
+            return _CANONICAL.get(s, s.title())
+    # Fallback: last word (often the state in Indian addresses)
+    words = [w.strip(".,- \n") for w in clean.split()]
+    words = [w for w in words if w and not w.isdigit() and len(w) > 1]
+    return words[-1].title() if words else "Unknown"
 
 
 def _month_key(inv_date: str) -> str:
@@ -59,7 +101,7 @@ def get_stats(db: Session = Depends(get_db)):
         inv_total = taxable + cgst + sgst + igst
         is_return = (inv.transaction_type or "Sale") == "Return"
         platform  = inv.platform or "Other"
-        state     = (inv.party_address or "Unknown").strip().title()
+        state     = _extract_state(inv.party_address or "")
         month     = _month_key(inv.inv_date)
 
         total_taxable += taxable

@@ -16,7 +16,8 @@ ALLOWED_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".tiff", ".bmp", ".webp"}
 MAX_FILE_SIZE = 20 * 1024 * 1024  # 20 MB
 
 # Thread pool for parallel OCR — each call is an outbound HTTP request to OpenAI
-_ocr_pool = ThreadPoolExecutor(max_workers=10)
+# 15 workers handles a full batch of 10 files plus headroom
+_ocr_pool = ThreadPoolExecutor(max_workers=15)
 
 
 def _normalize_inv(inv_no: str) -> str:
@@ -69,8 +70,13 @@ async def _ocr_one(filename: str, content: bytes) -> dict:
 
     loop = asyncio.get_event_loop()
     try:
-        rows = await loop.run_in_executor(_ocr_pool, extract_invoices, content, filename)
+        rows = await asyncio.wait_for(
+            loop.run_in_executor(_ocr_pool, extract_invoices, content, filename),
+            timeout=120,  # 2 min per file — GPT-4o is fast, this is a safety net
+        )
         return {"filename": filename, "ok": True, "rows": rows}
+    except asyncio.TimeoutError:
+        return {"filename": filename, "ok": False, "error": "OCR timed out (>2 min)", "rows": []}
     except Exception as exc:
         return {"filename": filename, "ok": False, "error": str(exc), "rows": []}
 

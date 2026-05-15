@@ -1,20 +1,26 @@
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  Legend, ResponsiveContainer, Cell,
+  Legend, ResponsiveContainer,
 } from "recharts";
 
 const INR = (v) => `₹${Number(v).toLocaleString("en-IN")}`;
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
+  const count = payload[0]?.payload?.count;
   return (
-    <div className="bg-white border border-slate-200 rounded-xl shadow-lg p-3 text-xs">
-      <p className="font-bold text-slate-800 mb-1.5">{label}</p>
+    <div className="bg-white border border-slate-200 rounded-xl shadow-lg p-3 text-xs min-w-[180px]">
+      <p className="font-bold text-slate-800 mb-1">{label}</p>
+      {count != null && (
+        <p className="text-slate-400 text-[10px] mb-1.5">{count} invoice{count !== 1 ? "s" : ""}</p>
+      )}
       {payload.map((p) => (
-        <div key={p.name} className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full" style={{ background: p.color }} />
-          <span className="text-slate-600">{p.name}:</span>
-          <span className="font-semibold">{INR(p.value)}</span>
+        <div key={p.name} className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full" style={{ background: p.color }} />
+            <span className="text-slate-600">{p.name}</span>
+          </div>
+          <span className="font-semibold tabular-nums">{INR(p.value)}</span>
         </div>
       ))}
     </div>
@@ -36,20 +42,23 @@ export default function StateBarChart({ data }) {
   }
 
   const chartData = data.map((d) => ({
-    state: d.state.length > 12 ? d.state.slice(0, 12) + "…" : d.state,
-    fullState: d.state,
+    state: d.state,
     Sales: d.sales_total,
     Returns: d.returns_total,
     count: d.count,
   }));
 
+  // Dynamically size the chart height based on number of states
+  const chartHeight = Math.max(220, chartData.length * 32);
+
   return (
-    <ResponsiveContainer width="100%" height={260}>
+    <ResponsiveContainer width="100%" height={chartHeight}>
       <BarChart
         data={chartData}
         layout="vertical"
-        margin={{ top: 4, right: 16, left: 0, bottom: 4 }}
+        margin={{ top: 4, right: 20, left: 4, bottom: 4 }}
         barSize={10}
+        barGap={3}
       >
         <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" horizontal={false} />
         <XAxis
@@ -62,14 +71,14 @@ export default function StateBarChart({ data }) {
         <YAxis
           type="category"
           dataKey="state"
-          width={100}
-          tick={{ fontSize: 11, fill: "#475569" }}
+          width={130}
+          tick={{ fontSize: 11, fill: "#475569", fontWeight: 500 }}
           axisLine={false}
           tickLine={false}
         />
-        <Tooltip content={<CustomTooltip />} />
+        <Tooltip content={<CustomTooltip />} cursor={{ fill: "#F8FAFC" }} />
         <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
-        <Bar dataKey="Sales" fill="#16A34A" radius={[0, 4, 4, 0]} />
+        <Bar dataKey="Sales"   fill="#16A34A" radius={[0, 4, 4, 0]} />
         <Bar dataKey="Returns" fill="#E11D48" radius={[0, 4, 4, 0]} />
       </BarChart>
     </ResponsiveContainer>

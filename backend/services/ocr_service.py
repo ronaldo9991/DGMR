@@ -37,7 +37,7 @@ Each element in the array must have these exact keys:
 - cgst9: CGST amount (9%) as number, null if not applicable
 - sgst9: SGST amount (9%) as number, null if not applicable
 - igst18: IGST amount (18%) as number, null if not applicable
-- party_address: buyer state/address (string or null)
+- party_address: the INDIAN STATE NAME ONLY of the buyer (e.g. "Tamil Nadu", "Karnataka", "Maharashtra") — extract just the state, not the full address or PIN code
 - cancelled: true if the invoice is marked CANCEL/CANCELLED, otherwise false
 
 Rules:
