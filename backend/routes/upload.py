@@ -124,6 +124,16 @@ async def upload_documents(
             "transaction_type": transaction_type,
             "platform": ocr["rows"][0].platform if ocr["rows"] else None,
             "sales_cancelled": cancelled_ids,
+            "invoices": [
+                {
+                    "inv_no": row.inv_no,
+                    "inv_date": row.inv_date,
+                    "party_name": row.party_name,
+                    "taxable_value": row.taxable_value,
+                    "cancelled": row.cancelled,
+                }
+                for row in ocr["rows"]
+            ],
         })
 
     return {

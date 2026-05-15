@@ -18,9 +18,11 @@ def _get_client() -> OpenAI:
 
 EXTRACTION_PROMPT = """You are an OCR extraction assistant for e-commerce seller invoices (Amazon/Flipkart).
 
-This document contains one or more invoice entries. Extract ALL invoice rows and return a JSON array.
+This document may contain MULTIPLE invoice entries — sometimes 5 or more rows in a single table or across multiple pages.
+Extract EVERY SINGLE invoice row and return a JSON array. Do not skip any row, even if values repeat.
+
 Each element in the array must have these exact keys:
-- platform: "Amazon", "Flipkart", or "Other" (detect from document header/logo/watermark)
+- platform: "Amazon", "Flipkart", or "Other" (detect from document header/logo/watermark; apply same platform to all rows if document is from one seller)
 - qty: integer quantity (default 1 if not shown)
 - party_name: customer/buyer name (string or null)
 - gst_number: GST/GSTIN number of buyer (string or null)
@@ -34,8 +36,10 @@ Each element in the array must have these exact keys:
 - cancelled: true if the invoice is marked CANCEL/CANCELLED, otherwise false
 
 Rules:
+- If the document is a tabular list (e.g. invoice register, batch report), each DATA ROW is a separate invoice — extract them all
 - If CGST+SGST are present (intra-state, same state as seller), set cgst9 and sgst9; set igst18 to null
 - If IGST is present (inter-state), set igst18; set cgst9 and sgst9 to null
+- Header rows, subtotal rows, and grand-total rows are NOT invoices — skip them
 - If a row has no party name and no taxable value, still include it with nulls for those fields
 - Return ONLY the JSON array, no explanation or markdown fences"""
 
@@ -74,44 +78,48 @@ def _to_int(val) -> Optional[int]:
         return 1
 
 
-def _pdf_to_image_bytes(pdf_bytes: bytes) -> bytes:
+def _pdf_to_all_pages(pdf_bytes: bytes) -> List[bytes]:
     from pdf2image import convert_from_bytes
-    images = convert_from_bytes(pdf_bytes, first_page=1, last_page=1, dpi=200)
-    buf = BytesIO()
-    images[0].save(buf, format="PNG")
-    return buf.getvalue()
+    images = convert_from_bytes(pdf_bytes, dpi=200)
+    result = []
+    for img in images:
+        buf = BytesIO()
+        img.save(buf, format="PNG")
+        result.append(buf.getvalue())
+    return result
 
 
 def extract_invoices(file_bytes: bytes, filename: str) -> List[InvoiceRow]:
     ext = os.path.splitext(filename.lower())[1]
 
     if ext == ".pdf":
-        image_bytes = _pdf_to_image_bytes(file_bytes)
-        media_type = "image/png"
+        page_bytes_list = _pdf_to_all_pages(file_bytes)
     else:
-        image_bytes = file_bytes
         media_type = "image/jpeg" if ext in (".jpg", ".jpeg") else "image/png"
+        page_bytes_list = [(file_bytes, media_type)]
 
-    b64 = base64.b64encode(image_bytes).decode("utf-8")
+    # Build image content blocks — one per page (PDFs) or one for the image
+    image_blocks = []
+    for item in page_bytes_list:
+        if isinstance(item, tuple):
+            raw, mt = item
+        else:
+            raw, mt = item, "image/png"
+        b64 = base64.b64encode(raw).decode("utf-8")
+        image_blocks.append({
+            "type": "image_url",
+            "image_url": {"url": f"data:{mt};base64,{b64}", "detail": "high"},
+        })
 
     response = _get_client().chat.completions.create(
         model="gpt-4o",
         messages=[
             {
                 "role": "user",
-                "content": [
-                    {"type": "text", "text": EXTRACTION_PROMPT},
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:{media_type};base64,{b64}",
-                            "detail": "high",
-                        },
-                    },
-                ],
+                "content": [{"type": "text", "text": EXTRACTION_PROMPT}] + image_blocks,
             }
         ],
-        max_tokens=4000,
+        max_tokens=8000,
     )
 
     raw = response.choices[0].message.content.strip()

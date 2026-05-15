@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useDropzone } from "react-dropzone";
 import axios from "axios";
 
@@ -89,75 +89,145 @@ function StepBar({ status }) {
   );
 }
 
+const INR = (v) =>
+  v != null ? `₹${Number(v).toLocaleString("en-IN", { minimumFractionDigits: 2 })}` : "—";
+
 /* ── File card ───────────────────────────────────────────────────────── */
 function FileCard({ file, onRemove }) {
+  const [expanded, setExpanded] = useState(false);
   const processed = file.status === "done" && file.result?.status === "processed";
   const isErr = file.status === "error" || file.result?.status === "error";
   const isReturn = file.result?.transaction_type === "Return";
   const cancelled = file.result?.sales_cancelled?.length ?? 0;
+  const invoices = file.result?.invoices ?? [];
+  const multiRow = invoices.length > 1;
 
   return (
-    <div className={`rounded-xl border p-4 transition-all ${
+    <div className={`rounded-xl border transition-all ${
       processed ? (isReturn ? "border-rose-200 bg-rose-50" : "border-emerald-200 bg-emerald-50")
       : isErr ? "border-red-200 bg-red-50"
       : "border-slate-200 bg-white"
     }`}>
-      <div className="flex items-start gap-3">
-        {/* Icon */}
-        <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
-          processed ? (isReturn ? "bg-rose-100" : "bg-emerald-100")
-          : isErr ? "bg-red-100" : "bg-slate-100"
-        }`}>
-          <svg className={`w-5 h-5 ${processed ? (isReturn ? "text-rose-600" : "text-emerald-600") : isErr ? "text-red-500" : "text-slate-500"}`}
-            fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-        </div>
-
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-2">
-            <p className="text-sm font-semibold text-slate-800 truncate max-w-[200px]">{file.name}</p>
-            {(file.status === "queued" || isErr) && (
-              <button onClick={() => onRemove(file.id)} className="text-slate-400 hover:text-red-500 p-0.5">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            )}
+      <div className="p-4">
+        <div className="flex items-start gap-3">
+          {/* Icon */}
+          <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
+            processed ? (isReturn ? "bg-rose-100" : "bg-emerald-100")
+            : isErr ? "bg-red-100" : "bg-slate-100"
+          }`}>
+            <svg className={`w-5 h-5 ${processed ? (isReturn ? "text-rose-600" : "text-emerald-600") : isErr ? "text-red-500" : "text-slate-500"}`}
+              fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
           </div>
 
-          {/* Badges */}
-          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-            {file.result?.platform && (
-              <span className={`text-xs font-bold px-2 py-0.5 rounded-full text-white ${
-                file.result.platform === "Amazon" ? "bg-blue-600"
-                : file.result.platform === "Flipkart" ? "bg-orange-500"
-                : "bg-slate-600"
-              }`}>{file.result.platform}</span>
-            )}
-            {processed && (
-              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                isReturn ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"
-              }`}>
-                {isReturn ? "↩ Return" : "✓ Sale"} · {file.result.rows_added} row{file.result.rows_added !== 1 ? "s" : ""}
-              </span>
-            )}
-            {cancelled > 0 && (
-              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
-                {cancelled} sale{cancelled !== 1 ? "s" : ""} cancelled
-              </span>
-            )}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-sm font-semibold text-slate-800 truncate max-w-[220px]">{file.name}</p>
+              {(file.status === "queued" || isErr) && (
+                <button onClick={() => onRemove(file.id)} className="text-slate-400 hover:text-red-500 p-0.5">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+
+            {/* Badges */}
+            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+              {file.result?.platform && (
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-full text-white ${
+                  file.result.platform === "Amazon" ? "bg-blue-600"
+                  : file.result.platform === "Flipkart" ? "bg-orange-500"
+                  : "bg-slate-600"
+                }`}>{file.result.platform}</span>
+              )}
+              {processed && (
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                  isReturn ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"
+                }`}>
+                  {isReturn ? "↩ Return" : "✓ Sale"} · {file.result.rows_added} invoice{file.result.rows_added !== 1 ? "s" : ""}
+                </span>
+              )}
+              {cancelled > 0 && (
+                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                  {cancelled} sale{cancelled !== 1 ? "s" : ""} cancelled
+                </span>
+              )}
+            </div>
           </div>
         </div>
+
+        <StepBar status={file.status} />
+
+        {isErr && (
+          <p className="text-xs text-red-600 mt-2 font-medium">
+            {file.error || file.result?.error || "Extraction failed"}
+          </p>
+        )}
+
+        {/* Expand toggle for multi-invoice documents */}
+        {processed && multiRow && (
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className={`mt-3 flex items-center gap-1.5 text-xs font-semibold transition-colors ${
+              isReturn ? "text-rose-600 hover:text-rose-800" : "text-emerald-700 hover:text-emerald-900"
+            }`}
+          >
+            <svg className={`w-3.5 h-3.5 transition-transform ${expanded ? "rotate-90" : ""}`}
+              fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+            </svg>
+            {expanded ? "Hide" : "Show"} {invoices.length} extracted invoices
+          </button>
+        )}
       </div>
 
-      <StepBar status={file.status} />
-
-      {isErr && (
-        <p className="text-xs text-red-600 mt-2 font-medium">
-          {file.error || file.result?.error || "Extraction failed"}
-        </p>
+      {/* Invoice breakdown table */}
+      {processed && multiRow && expanded && (
+        <div className="border-t border-slate-200 overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="bg-slate-100 text-slate-500 font-semibold">
+                <th className="px-3 py-2 text-left">#</th>
+                <th className="px-3 py-2 text-left">INV No</th>
+                <th className="px-3 py-2 text-left">Date</th>
+                <th className="px-3 py-2 text-left">Party</th>
+                <th className="px-3 py-2 text-right">Taxable (₹)</th>
+                <th className="px-3 py-2 text-center">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {invoices.map((inv, i) => (
+                <tr key={i} className={`border-t border-slate-100 ${inv.cancelled ? "opacity-50" : ""}`}>
+                  <td className="px-3 py-1.5 text-slate-400">{i + 1}</td>
+                  <td className="px-3 py-1.5 font-mono font-semibold text-slate-700">{inv.inv_no || "—"}</td>
+                  <td className="px-3 py-1.5 text-slate-500">{inv.inv_date || "—"}</td>
+                  <td className="px-3 py-1.5 text-slate-700 max-w-[140px] truncate">{inv.party_name || "—"}</td>
+                  <td className="px-3 py-1.5 text-right font-semibold tabular-nums text-slate-800">{INR(inv.taxable_value)}</td>
+                  <td className="px-3 py-1.5 text-center">
+                    {inv.cancelled
+                      ? <span className="text-red-500 font-bold">Cancelled</span>
+                      : <span className={`font-bold ${isReturn ? "text-rose-600" : "text-emerald-600"}`}>
+                          {isReturn ? "Return" : "Sale"}
+                        </span>
+                    }
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-slate-200 bg-slate-50">
+                <td colSpan={4} className="px-3 py-1.5 font-bold text-slate-600">Total</td>
+                <td className="px-3 py-1.5 text-right font-bold text-slate-900 tabular-nums">
+                  {INR(invoices.reduce((s, inv) => s + (inv.taxable_value || 0), 0))}
+                </td>
+                <td />
+              </tr>
+            </tfoot>
+          </table>
+        </div>
       )}
     </div>
   );
