@@ -296,12 +296,12 @@ export default function Upload() {
   const totalCancelled = files.reduce((s, f) => s + (f.result?.sales_cancelled?.length || 0), 0);
 
   return (
-    <div className="p-8">
-      <div className="max-w-2xl space-y-6">
+    <div className="p-4 sm:p-8">
+      <div className="max-w-2xl space-y-5 sm:space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Upload Invoices</h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Upload Invoices</h1>
+          <p className="text-slate-500 text-xs sm:text-sm mt-1">
             GPT-4o Vision reads every row from your invoice. Select the document type before uploading.
           </p>
         </div>
@@ -326,7 +326,7 @@ export default function Upload() {
         {/* Drop zone */}
         <div
           {...getRootProps()}
-          className={`relative border-2 border-dashed rounded-2xl p-10 text-center cursor-pointer transition-all ${
+          className={`relative border-2 border-dashed rounded-2xl p-6 sm:p-10 text-center cursor-pointer transition-all ${
             isDragActive
               ? "border-blue-400 bg-blue-50"
               : "border-slate-300 hover:border-blue-400 hover:bg-slate-50"

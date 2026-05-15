@@ -18,8 +18,8 @@ const PLATFORM_ICONS = {
 };
 
 const PLATFORM_STYLES = {
-  All: { active: "bg-slate-900 text-white", dot: "bg-slate-400" },
-  Amazon: { active: "bg-blue-600 text-white", dot: "bg-blue-400" },
+  All:      { active: "bg-slate-900 text-white",  dot: "bg-slate-400" },
+  Amazon:   { active: "bg-blue-600 text-white",   dot: "bg-blue-400" },
   Flipkart: { active: "bg-orange-500 text-white", dot: "bg-orange-400" },
 };
 
@@ -36,7 +36,7 @@ export default function PlatformTabs({ active, onChange, counts = {} }) {
           <button
             key={tab}
             onClick={() => onChange(tab)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all whitespace-nowrap min-h-[38px] ${
               isActive
                 ? styles.active + " shadow-sm"
                 : "bg-white text-slate-600 border border-slate-200 hover:border-slate-300 hover:bg-slate-50"
@@ -45,7 +45,7 @@ export default function PlatformTabs({ active, onChange, counts = {} }) {
             {PLATFORM_ICONS[tab]}
             {tab}
             {count !== undefined && (
-              <span className={`text-xs px-1.5 py-0.5 rounded-md font-bold ${
+              <span className={`text-[10px] sm:text-xs px-1.5 py-0.5 rounded-md font-bold ${
                 isActive ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
               }`}>
                 {count}

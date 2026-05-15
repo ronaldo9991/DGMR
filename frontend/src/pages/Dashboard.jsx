@@ -13,14 +13,14 @@ const NUM = (n) => Number(n || 0).toLocaleString("en-IN");
 /* ── Stat card ───────────────────────────────────────────────────────── */
 function StatCard({ label, value, sub, icon, accent, highlight }) {
   return (
-    <div className={`card flex items-start gap-4 ${highlight ? "ring-2 ring-offset-1 " + highlight : ""}`}>
-      <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${accent}`}>
+    <div className={`card p-4 sm:p-6 flex items-start gap-3 sm:gap-4 ${highlight ? "ring-2 ring-offset-1 " + highlight : ""}`}>
+      <div className={`w-9 h-9 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${accent}`}>
         {icon}
       </div>
       <div className="min-w-0">
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{label}</p>
-        <p className="text-xl font-bold text-slate-900 mt-0.5 truncate">{value}</p>
-        {sub && <p className="text-xs text-slate-400 mt-0.5">{sub}</p>}
+        <p className="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wide leading-tight">{label}</p>
+        <p className="text-base sm:text-xl font-bold text-slate-900 mt-0.5 truncate">{value}</p>
+        {sub && <p className="text-[10px] sm:text-xs text-slate-400 mt-0.5 hidden sm:block">{sub}</p>}
       </div>
     </div>
   );
@@ -117,12 +117,12 @@ export default function Dashboard() {
   const flipkartData = stats.platforms?.find((p) => p.name === "Flipkart");
 
   return (
-    <div className="p-8 space-y-8">
+    <div className="p-4 sm:p-6 md:p-8 space-y-5 md:space-y-8">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-          <p className="text-slate-500 text-sm mt-1">Amazon &amp; Flipkart — Sales &amp; Returns overview</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Dashboard</h1>
+          <p className="text-slate-500 text-xs sm:text-sm mt-1">Amazon &amp; Flipkart — Sales &amp; Returns overview</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => load(true)} disabled={refreshing} className="btn-secondary text-xs px-3 py-1.5">
@@ -135,21 +135,22 @@ export default function Dashboard() {
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
-            Download All Excel
+            <span className="hidden sm:inline">Download All Excel</span>
+            <span className="sm:hidden">Excel</span>
           </a>
         </div>
       </div>
 
       {/* Platform cards */}
       {(amazonData || flipkartData) && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           {amazonData   && <PlatformCard platform="Amazon"   data={amazonData} />}
           {flipkartData && <PlatformCard platform="Flipkart" data={flipkartData} />}
         </div>
       )}
 
       {/* Global KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <StatCard
           label="Net Revenue"
           value={INR(stats.net_revenue)}
@@ -182,44 +183,46 @@ export default function Dashboard() {
       </div>
 
       {/* Sales vs Returns chart + Platform donut */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="card lg:col-span-2">
-          <h2 className="font-bold text-slate-900 mb-1">Monthly Sales vs Returns</h2>
-          <p className="text-xs text-slate-400 mb-5">Revenue comparison by month</p>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+        <div className="card p-4 sm:p-6 lg:col-span-2">
+          <h2 className="font-bold text-slate-900 mb-0.5 text-sm sm:text-base">Monthly Sales vs Returns</h2>
+          <p className="text-xs text-slate-400 mb-4">Revenue comparison by month</p>
           <SalesVsReturnsChart data={stats.by_month} />
         </div>
-        <div className="card">
-          <h2 className="font-bold text-slate-900 mb-5">Platform Split</h2>
+        <div className="card p-4 sm:p-6">
+          <h2 className="font-bold text-slate-900 mb-4 text-sm sm:text-base">Platform Split</h2>
           <StatusPieChart platforms={stats.platforms} />
         </div>
       </div>
 
       {/* Platform monthly + State-wise */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="card">
-          <div className="flex items-center justify-between mb-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        <div className="card p-4 sm:p-6">
+          <div className="flex items-center justify-between mb-3">
             <div>
-              <h2 className="font-bold text-slate-900">Monthly by Platform</h2>
+              <h2 className="font-bold text-slate-900 text-sm sm:text-base">Monthly by Platform</h2>
               <p className="text-xs text-slate-400 mt-0.5">Filter by platform below</p>
             </div>
           </div>
-          <PlatformTabs active={activePlatform} onChange={setActivePlatform} counts={tabCounts} />
+          <div className="overflow-x-auto scrollbar-hide">
+            <PlatformTabs active={activePlatform} onChange={setActivePlatform} counts={tabCounts} />
+          </div>
           <div className="mt-4">
             <MonthlyBarChart data={filteredMonths} platform={activePlatform} />
           </div>
         </div>
 
-        <div className="card">
-          <h2 className="font-bold text-slate-900 mb-1">State-wise Breakdown</h2>
+        <div className="card p-4 sm:p-6">
+          <h2 className="font-bold text-slate-900 mb-0.5 text-sm sm:text-base">State-wise Breakdown</h2>
           <p className="text-xs text-slate-400 mb-4">Top states by invoice count</p>
           <StateBarChart data={filteredStates} />
         </div>
       </div>
 
       {/* GST breakdown + Recent activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="card">
-          <h2 className="font-bold text-slate-900 mb-5">GST Breakdown</h2>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        <div className="card p-4 sm:p-6">
+          <h2 className="font-bold text-slate-900 mb-4 text-sm sm:text-base">GST Breakdown</h2>
           <div className="space-y-4">
             {[
               { label: "CGST (9%)", value: stats.total_cgst, color: "bg-blue-500", text: "text-blue-700" },
@@ -243,8 +246,8 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="card">
-          <h2 className="font-bold text-slate-900 mb-4">Recent Activity</h2>
+        <div className="card p-4 sm:p-6">
+          <h2 className="font-bold text-slate-900 mb-4 text-sm sm:text-base">Recent Activity</h2>
           <StateGraph recent={stats.recent_uploads} />
         </div>
       </div>

@@ -155,12 +155,12 @@ export default function Records() {
   const grandTotal = totals.taxable_value + totals.cgst9 + totals.sgst9 + totals.igst18;
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-4 sm:p-6 md:p-8 space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Records</h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Records</h1>
+          <p className="text-slate-500 text-xs sm:text-sm mt-1">
             {total} row{total !== 1 ? "s" : ""}
             {salesRows.length > 0 && ` · ${salesRows.length} sales`}
             {returnRows.length > 0 && ` · ${returnRows.length} returns`}
@@ -171,16 +171,22 @@ export default function Records() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
           </svg>
-          Download Excel
+          <span className="hidden sm:inline">Download Excel</span>
+          <span className="sm:hidden">Excel</span>
         </a>
       </div>
 
-      {/* Platform tabs */}
-      <PlatformTabs active={activePlatform} onChange={(p) => { setActivePlatform(p); setActiveWarehouse("All"); }} counts={tabCounts} />
+      {/* Platform tabs — horizontally scrollable on mobile */}
+      <div className="overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
+        <div className="flex min-w-max sm:min-w-0">
+          <PlatformTabs active={activePlatform} onChange={(p) => { setActivePlatform(p); setActiveWarehouse("All"); }} counts={tabCounts} />
+        </div>
+      </div>
 
-      {/* Amazon warehouse tabs */}
+      {/* Amazon warehouse tabs — scrollable on mobile */}
       {activePlatform === "Amazon" && (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="overflow-x-auto scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0">
+        <div className="flex items-center gap-2 min-w-max sm:min-w-0 flex-wrap sm:flex-wrap pb-1">
           <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Warehouse</span>
           {["All", ...AMAZON_WAREHOUSES].map((wh) => (
             <button
@@ -204,14 +210,15 @@ export default function Records() {
               download
               className="ml-2 text-xs font-semibold px-3 py-1 rounded-full border border-blue-300 text-blue-700 hover:bg-blue-50 transition-colors"
             >
-              ⬇ Download {activeWarehouse} Excel
+              ⬇ {activeWarehouse} Excel
             </a>
           )}
+        </div>
         </div>
       )}
 
       {/* Type filter + search */}
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         {/* Sale / Return / All toggle */}
         <div className="flex rounded-xl overflow-hidden border border-slate-200">
           {["All", "Sale", "Return"].map((t) => (
@@ -233,16 +240,16 @@ export default function Records() {
           ))}
         </div>
 
-        <div className="relative">
+        <div className="relative flex-1 sm:flex-none">
           <svg className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <input
             type="text"
-            placeholder="Search name, INV no, GST, state…"
+            placeholder="Search name, INV no, GST…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-sm w-64 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-sm w-full sm:w-64 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
 
@@ -300,8 +307,9 @@ export default function Records() {
         </div>
       )}
 
-      {/* Table */}
-      <div className="card overflow-x-auto p-0 rounded-2xl">
+      {/* Table — edge-to-edge on mobile, card on sm+ */}
+      <div className="-mx-4 sm:mx-0 sm:card sm:rounded-2xl overflow-hidden">
+        <div className="overflow-x-auto scrollbar-hide">
         <table className="data-table min-w-[1250px]">
           <thead>
             <tr>
@@ -391,6 +399,7 @@ export default function Records() {
             </tfoot>
           )}
         </table>
+        </div>
       </div>
     </div>
   );
