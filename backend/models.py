@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, func
+from sqlalchemy import Boolean, Column, Float, Integer, String, DateTime, func
 from database import Base
 
 
@@ -6,21 +6,22 @@ class Invoice(Base):
     __tablename__ = "invoices"
 
     id = Column(Integer, primary_key=True, index=True)
-    invoice_no = Column(String, nullable=True)
-    date = Column(String, nullable=True)
-    customer_name = Column(String, nullable=True)
-    from_station = Column(String, nullable=True)
-    to_station = Column(String, nullable=True)
-    consignment_no = Column(String, nullable=True)
-    goods_description = Column(String, nullable=True)
-    weight_kg = Column(Float, nullable=True)
-    rate_per_kg = Column(Float, nullable=True)
-    freight_amount = Column(Float, nullable=True)
-    gst_percent = Column(Float, nullable=True)
-    gst_amount = Column(Float, nullable=True)
-    total_amount = Column(Float, nullable=True)
-    type = Column(String, nullable=True)           # Sale | Return
-    payment_status = Column(String, nullable=True)  # Paid | Pending | Partial
+
+    # Exact columns from Amazon/Flipkart template
+    platform = Column(String, nullable=True)        # Amazon | Flipkart | Other
+    qty = Column(Integer, nullable=True, default=1)
+    party_name = Column(String, nullable=True)
+    gst_number = Column(String, nullable=True)
+    inv_no = Column(String, nullable=True)
+    inv_date = Column(String, nullable=True)
+    taxable_value = Column(Float, nullable=True)
+    cgst9 = Column(Float, nullable=True)
+    sgst9 = Column(Float, nullable=True)
+    igst18 = Column(Float, nullable=True)
+    party_address = Column(String, nullable=True)   # State
+    cancelled = Column(Boolean, default=False)
+
+    # Meta
     document_file = Column(String, nullable=True)
-    status = Column(String, default="processed")   # processed | error
+    status = Column(String, default="processed")    # processed | error
     created_at = Column(DateTime, server_default=func.now())

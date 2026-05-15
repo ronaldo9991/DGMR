@@ -1,5 +1,10 @@
 import os
+from pathlib import Path
+
+from dotenv import load_dotenv
 from fastapi import FastAPI
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -22,6 +27,16 @@ app.include_router(upload.router, prefix="/api")
 app.include_router(records.router, prefix="/api")
 app.include_router(excel.router, prefix="/api")
 app.include_router(stats.router, prefix="/api")
+
+
+@app.get("/")
+def root():
+    return {
+        "service": "DGMR TECH OCR Dashboard API",
+        "status": "ok",
+        "docs": "/docs",
+        "health": "/api/health",
+    }
 
 
 @app.get("/api/health")

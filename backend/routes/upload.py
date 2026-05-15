@@ -1,13 +1,12 @@
 import os
-import tempfile
 from typing import List
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, UploadFile
 from sqlalchemy.orm import Session
 
 from database import get_db
 from models import Invoice
-from services.ocr_service import extract_invoice
+from services.ocr_service import extract_invoices
 
 router = APIRouter()
 
@@ -22,55 +21,57 @@ async def upload_documents(files: List[UploadFile] = File(...), db: Session = De
     for file in files:
         ext = os.path.splitext(file.filename.lower())[1]
         if ext not in ALLOWED_EXTENSIONS:
-            results.append({"filename": file.filename, "status": "error", "error": "Unsupported file type"})
+            results.append({"filename": file.filename, "status": "error", "error": "Unsupported file type", "rows_added": 0})
             continue
 
         try:
             content = await file.read()
             if len(content) > MAX_FILE_SIZE:
-                results.append({"filename": file.filename, "status": "error", "error": "File too large (max 20MB)"})
+                results.append({"filename": file.filename, "status": "error", "error": "File too large (max 20MB)", "rows_added": 0})
                 continue
 
-            invoice_data = extract_invoice(content, file.filename)
+            invoice_rows = extract_invoices(content, file.filename)
+            added = 0
 
-            row = Invoice(
-                invoice_no=invoice_data.invoice_no,
-                date=invoice_data.date,
-                customer_name=invoice_data.customer_name,
-                from_station=invoice_data.from_station,
-                to_station=invoice_data.to_station,
-                consignment_no=invoice_data.consignment_no,
-                goods_description=invoice_data.goods_description,
-                weight_kg=invoice_data.weight_kg,
-                rate_per_kg=invoice_data.rate_per_kg,
-                freight_amount=invoice_data.freight_amount,
-                gst_percent=invoice_data.gst_percent,
-                gst_amount=invoice_data.gst_amount,
-                total_amount=invoice_data.total_amount,
-                type=invoice_data.type,
-                payment_status=invoice_data.payment_status,
-                document_file=file.filename,
-                status="processed",
-            )
-            db.add(row)
+            for row in invoice_rows:
+                inv = Invoice(
+                    platform=row.platform,
+                    qty=row.qty,
+                    party_name=row.party_name,
+                    gst_number=row.gst_number,
+                    inv_no=row.inv_no,
+                    inv_date=row.inv_date,
+                    taxable_value=row.taxable_value,
+                    cgst9=row.cgst9,
+                    sgst9=row.sgst9,
+                    igst18=row.igst18,
+                    party_address=row.party_address,
+                    cancelled=row.cancelled,
+                    document_file=file.filename,
+                    status="processed",
+                )
+                db.add(inv)
+                added += 1
+
             db.commit()
-            db.refresh(row)
 
             results.append({
                 "filename": file.filename,
                 "status": "processed",
-                "id": row.id,
-                "invoice_no": row.invoice_no,
-                "customer_name": row.customer_name,
-                "total_amount": row.total_amount,
-                "type": row.type,
+                "rows_added": added,
+                "platform": invoice_rows[0].platform if invoice_rows else None,
             })
 
         except Exception as e:
             db.rollback()
-            row = Invoice(document_file=file.filename, status="error")
-            db.add(row)
+            db.add(Invoice(document_file=file.filename, status="error"))
             db.commit()
-            results.append({"filename": file.filename, "status": "error", "error": str(e)})
+            results.append({"filename": file.filename, "status": "error", "error": str(e), "rows_added": 0})
 
-    return {"results": results, "total": len(results), "processed": sum(1 for r in results if r["status"] == "processed")}
+    total_rows = sum(r.get("rows_added", 0) for r in results)
+    return {
+        "results": results,
+        "total_files": len(results),
+        "total_rows_added": total_rows,
+        "processed": sum(1 for r in results if r["status"] == "processed"),
+    }

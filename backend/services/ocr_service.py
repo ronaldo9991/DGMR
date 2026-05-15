@@ -2,9 +2,9 @@ import base64
 import json
 import os
 import re
-import tempfile
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass
+from io import BytesIO
+from typing import List, Optional
 
 from openai import OpenAI
 
@@ -15,44 +15,45 @@ def _get_client() -> OpenAI:
         raise RuntimeError("OPENAI_API_KEY environment variable is not set")
     return OpenAI(api_key=key)
 
-EXTRACTION_PROMPT = """You are an OCR extraction assistant for railway freight invoices.
-Extract invoice data from this image and return ONLY valid JSON with these exact keys:
-- invoice_no
-- date (as string, any format found)
-- customer_name
-- from_station
-- to_station
-- consignment_no
-- goods_description
-- weight_kg (numeric only, no units)
-- rate_per_kg (numeric only)
-- freight_amount (numeric only)
-- gst_percent (numeric only, e.g. 18 for 18%)
-- gst_amount (numeric only)
-- total_amount (numeric only)
-- type ("Sale" or "Return" — default to "Sale" if not specified)
-- payment_status ("Paid", "Pending", or "Partial" — default to "Pending" if not clear)
 
-If a field is not visible or not applicable, use null. Return ONLY the JSON object, no explanation."""
+EXTRACTION_PROMPT = """You are an OCR extraction assistant for e-commerce seller invoices (Amazon/Flipkart).
+
+This document contains one or more invoice entries. Extract ALL invoice rows and return a JSON array.
+Each element in the array must have these exact keys:
+- platform: "Amazon", "Flipkart", or "Other" (detect from document header/logo/watermark)
+- qty: integer quantity (default 1 if not shown)
+- party_name: customer/buyer name (string or null)
+- gst_number: GST/GSTIN number of buyer (string or null)
+- inv_no: invoice number as string (e.g. "1", "2", "INV-001")
+- inv_date: invoice date as string exactly as shown (e.g. "1.4.2026")
+- taxable_value: taxable/base amount as number (no currency symbol)
+- cgst9: CGST amount (9%) as number, null if not applicable
+- sgst9: SGST amount (9%) as number, null if not applicable
+- igst18: IGST amount (18%) as number, null if not applicable
+- party_address: buyer state/address (string or null)
+- cancelled: true if the invoice is marked CANCEL/CANCELLED, otherwise false
+
+Rules:
+- If CGST+SGST are present (intra-state, same state as seller), set cgst9 and sgst9; set igst18 to null
+- If IGST is present (inter-state), set igst18; set cgst9 and sgst9 to null
+- If a row has no party name and no taxable value, still include it with nulls for those fields
+- Return ONLY the JSON array, no explanation or markdown fences"""
 
 
 @dataclass
-class InvoiceData:
-    invoice_no: Optional[str] = None
-    date: Optional[str] = None
-    customer_name: Optional[str] = None
-    from_station: Optional[str] = None
-    to_station: Optional[str] = None
-    consignment_no: Optional[str] = None
-    goods_description: Optional[str] = None
-    weight_kg: Optional[float] = None
-    rate_per_kg: Optional[float] = None
-    freight_amount: Optional[float] = None
-    gst_percent: Optional[float] = None
-    gst_amount: Optional[float] = None
-    total_amount: Optional[float] = None
-    type: Optional[str] = "Sale"
-    payment_status: Optional[str] = "Pending"
+class InvoiceRow:
+    platform: Optional[str] = None
+    qty: Optional[int] = 1
+    party_name: Optional[str] = None
+    gst_number: Optional[str] = None
+    inv_no: Optional[str] = None
+    inv_date: Optional[str] = None
+    taxable_value: Optional[float] = None
+    cgst9: Optional[float] = None
+    sgst9: Optional[float] = None
+    igst18: Optional[float] = None
+    party_address: Optional[str] = None
+    cancelled: bool = False
 
 
 def _to_float(val) -> Optional[float]:
@@ -64,21 +65,24 @@ def _to_float(val) -> Optional[float]:
         return None
 
 
-def _image_to_base64(image_bytes: bytes) -> str:
-    return base64.b64encode(image_bytes).decode("utf-8")
+def _to_int(val) -> Optional[int]:
+    if val is None:
+        return 1
+    try:
+        return int(val)
+    except (ValueError, TypeError):
+        return 1
 
 
 def _pdf_to_image_bytes(pdf_bytes: bytes) -> bytes:
     from pdf2image import convert_from_bytes
-    from io import BytesIO
-
     images = convert_from_bytes(pdf_bytes, first_page=1, last_page=1, dpi=200)
     buf = BytesIO()
     images[0].save(buf, format="PNG")
     return buf.getvalue()
 
 
-def extract_invoice(file_bytes: bytes, filename: str) -> InvoiceData:
+def extract_invoices(file_bytes: bytes, filename: str) -> List[InvoiceRow]:
     ext = os.path.splitext(filename.lower())[1]
 
     if ext == ".pdf":
@@ -88,7 +92,7 @@ def extract_invoice(file_bytes: bytes, filename: str) -> InvoiceData:
         image_bytes = file_bytes
         media_type = "image/jpeg" if ext in (".jpg", ".jpeg") else "image/png"
 
-    b64 = _image_to_base64(image_bytes)
+    b64 = base64.b64encode(image_bytes).decode("utf-8")
 
     response = _get_client().chat.completions.create(
         model="gpt-4o",
@@ -99,35 +103,41 @@ def extract_invoice(file_bytes: bytes, filename: str) -> InvoiceData:
                     {"type": "text", "text": EXTRACTION_PROMPT},
                     {
                         "type": "image_url",
-                        "image_url": {"url": f"data:{media_type};base64,{b64}", "detail": "high"},
+                        "image_url": {
+                            "url": f"data:{media_type};base64,{b64}",
+                            "detail": "high",
+                        },
                     },
                 ],
             }
         ],
-        max_tokens=1000,
+        max_tokens=4000,
     )
 
     raw = response.choices[0].message.content.strip()
-    # Strip markdown code fences if present
     raw = re.sub(r"^```(?:json)?\s*", "", raw)
     raw = re.sub(r"\s*```$", "", raw)
 
-    data = json.loads(raw)
+    rows_data = json.loads(raw)
+    if isinstance(rows_data, dict):
+        rows_data = [rows_data]
 
-    return InvoiceData(
-        invoice_no=data.get("invoice_no"),
-        date=data.get("date"),
-        customer_name=data.get("customer_name"),
-        from_station=data.get("from_station"),
-        to_station=data.get("to_station"),
-        consignment_no=data.get("consignment_no"),
-        goods_description=data.get("goods_description"),
-        weight_kg=_to_float(data.get("weight_kg")),
-        rate_per_kg=_to_float(data.get("rate_per_kg")),
-        freight_amount=_to_float(data.get("freight_amount")),
-        gst_percent=_to_float(data.get("gst_percent")),
-        gst_amount=_to_float(data.get("gst_amount")),
-        total_amount=_to_float(data.get("total_amount")),
-        type=data.get("type") or "Sale",
-        payment_status=data.get("payment_status") or "Pending",
-    )
+    results = []
+    for d in rows_data:
+        results.append(
+            InvoiceRow(
+                platform=d.get("platform"),
+                qty=_to_int(d.get("qty")),
+                party_name=d.get("party_name"),
+                gst_number=d.get("gst_number"),
+                inv_no=str(d["inv_no"]) if d.get("inv_no") is not None else None,
+                inv_date=d.get("inv_date"),
+                taxable_value=_to_float(d.get("taxable_value")),
+                cgst9=_to_float(d.get("cgst9")),
+                sgst9=_to_float(d.get("sgst9")),
+                igst18=_to_float(d.get("igst18")),
+                party_address=d.get("party_address"),
+                cancelled=bool(d.get("cancelled", False)),
+            )
+        )
+    return results
