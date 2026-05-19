@@ -139,7 +139,7 @@ export default function Records() {
 
   const showWarehouse = activePlatform === "Amazon";
 
-  // Column spans for tfoot (before amount cols)
+  // Column spans for tfoot (before amount cols): Platform, [WH], Type, QTY, Party, GST No, INV No, Date
   const preAmtCols = showWarehouse ? 8 : 7;
 
   return (
@@ -281,18 +281,19 @@ export default function Records() {
       <div className="-mx-4 sm:mx-0 sm:card sm:rounded-2xl overflow-hidden">
         <table className="w-full table-fixed border-collapse text-[12px]">
           <colgroup>
-            <col className="w-[7%]" />   {/* Platform */}
-            {showWarehouse && <col className="w-[6%]" />}  {/* Warehouse */}
+            <col className="w-[6%]" />   {/* Platform */}
+            {showWarehouse && <col className="w-[5%]" />}  {/* Warehouse */}
             <col className="w-[7%]" />   {/* Type */}
-            <col className="w-[4%]" />   {/* QTY */}
-            <col className="w-[16%]" />  {/* Party Name */}
-            <col className="w-[11%]" />  {/* GST No */}
-            <col className="w-[7%]" />   {/* INV No */}
-            <col className="w-[7%]" />   {/* Date */}
-            <col className="w-[9%]" />   {/* Taxable */}
-            <col className="w-[8%]" />   {/* GST 9% */}
-            <col className="w-[8%]" />   {/* IGST 18% */}
-            <col className="w-[9%]" />   {/* Total */}
+            <col className="w-[3%]" />   {/* QTY */}
+            <col className="w-[14%]" />  {/* Party Name */}
+            <col className="w-[10%]" />  {/* GST No */}
+            <col className="w-[6%]" />   {/* INV No */}
+            <col className="w-[6%]" />   {/* Date */}
+            <col className="w-[8%]" />   {/* Taxable */}
+            <col className="w-[6%]" />   {/* CGST 9% */}
+            <col className="w-[6%]" />   {/* SGST 9% */}
+            <col className="w-[7%]" />   {/* IGST 18% */}
+            <col className="w-[8%]" />   {/* Total */}
             <col className="w-[6%]" />   {/* State */}
             <col className="w-[3%]" />   {/* Del */}
           </colgroup>
@@ -307,7 +308,8 @@ export default function Records() {
               <th className="text-left px-2 py-2.5 font-semibold text-slate-500 uppercase tracking-wide text-[10px]">INV No</th>
               <th className="text-left px-2 py-2.5 font-semibold text-slate-500 uppercase tracking-wide text-[10px]">Date</th>
               <th className="text-right px-2 py-2.5 font-semibold text-slate-500 uppercase tracking-wide text-[10px]">Taxable</th>
-              <th className="text-right px-2 py-2.5 font-semibold text-slate-500 uppercase tracking-wide text-[10px]">GST 9%</th>
+              <th className="text-right px-2 py-2.5 font-semibold text-slate-500 uppercase tracking-wide text-[10px]">CGST 9%</th>
+              <th className="text-right px-2 py-2.5 font-semibold text-slate-500 uppercase tracking-wide text-[10px]">SGST 9%</th>
               <th className="text-right px-2 py-2.5 font-semibold text-slate-500 uppercase tracking-wide text-[10px]">IGST 18%</th>
               <th className="text-right px-2 py-2.5 font-semibold text-slate-500 uppercase tracking-wide text-[10px]">Total</th>
               <th className="text-left px-2 py-2.5 font-semibold text-slate-500 uppercase tracking-wide text-[10px]">State</th>
@@ -331,7 +333,6 @@ export default function Records() {
               </td></tr>
             ) : records.map((rec) => {
               const rowTotal = (rec.taxable_value || 0) + (rec.cgst9 || 0) + (rec.sgst9 || 0) + (rec.igst18 || 0);
-              const gst9 = (rec.cgst9 || 0) + (rec.sgst9 || 0);
               return (
                 <tr key={rec.id}
                   className={`hover:bg-slate-50 transition-colors ${
@@ -353,7 +354,8 @@ export default function Records() {
                   </td>
                   <td className="px-2 py-2 text-slate-600 whitespace-nowrap">{rec.inv_date ?? "—"}</td>
                   <td className="px-2 py-2 text-right tabular-nums text-slate-700">{INR(rec.taxable_value)}</td>
-                  <td className="px-2 py-2 text-right tabular-nums text-slate-500">{gst9 > 0 ? INR(gst9) : "—"}</td>
+                  <td className="px-2 py-2 text-right tabular-nums text-slate-500">{INR(rec.cgst9)}</td>
+                  <td className="px-2 py-2 text-right tabular-nums text-slate-500">{INR(rec.sgst9)}</td>
                   <td className="px-2 py-2 text-right tabular-nums text-slate-500">{INR(rec.igst18)}</td>
                   <td className="px-2 py-2 text-right tabular-nums font-bold text-slate-900">{INR(rowTotal)}</td>
                   <td className="px-2 py-2 text-slate-500">
@@ -377,7 +379,8 @@ export default function Records() {
               <tr className="text-slate-400 font-medium">
                 <td colSpan={preAmtCols} className="px-3 py-1.5">Sales ({salesRows.length})</td>
                 <td className="text-right px-2 py-1.5 text-emerald-700 tabular-nums">{INR(salesTotals.taxable_value)}</td>
-                <td className="text-right px-2 py-1.5 text-emerald-700 tabular-nums">{INR(salesTotals.cgst9 + salesTotals.sgst9)}</td>
+                <td className="text-right px-2 py-1.5 text-emerald-700 tabular-nums">{INR(salesTotals.cgst9)}</td>
+                <td className="text-right px-2 py-1.5 text-emerald-700 tabular-nums">{INR(salesTotals.sgst9)}</td>
                 <td className="text-right px-2 py-1.5 text-emerald-700 tabular-nums">{INR(salesTotals.igst18)}</td>
                 <td className="text-right px-2 py-1.5 text-emerald-700 font-bold tabular-nums">
                   {INR(salesTotals.taxable_value + salesTotals.cgst9 + salesTotals.sgst9 + salesTotals.igst18)}
@@ -387,7 +390,8 @@ export default function Records() {
               <tr className="text-slate-400 font-medium">
                 <td colSpan={preAmtCols} className="px-3 py-1.5">Returns ({returnRows.length})</td>
                 <td className="text-right px-2 py-1.5 text-rose-600 tabular-nums">−{INR(returnTotals.taxable_value)}</td>
-                <td className="text-right px-2 py-1.5 text-rose-600 tabular-nums">−{INR(returnTotals.cgst9 + returnTotals.sgst9)}</td>
+                <td className="text-right px-2 py-1.5 text-rose-600 tabular-nums">−{INR(returnTotals.cgst9)}</td>
+                <td className="text-right px-2 py-1.5 text-rose-600 tabular-nums">−{INR(returnTotals.sgst9)}</td>
                 <td className="text-right px-2 py-1.5 text-rose-600 tabular-nums">−{INR(returnTotals.igst18)}</td>
                 <td className="text-right px-2 py-1.5 text-rose-600 font-bold tabular-nums">
                   −{INR(returnTotals.taxable_value + returnTotals.cgst9 + returnTotals.sgst9 + returnTotals.igst18)}
@@ -397,7 +401,8 @@ export default function Records() {
               <tr className="border-t border-slate-300 font-bold text-slate-800">
                 <td colSpan={preAmtCols} className="px-3 py-2">NET TOTAL</td>
                 <td className="text-right px-2 py-2 tabular-nums">{INR(totals.taxable_value)}</td>
-                <td className="text-right px-2 py-2 tabular-nums">{INR(totals.cgst9 + totals.sgst9)}</td>
+                <td className="text-right px-2 py-2 tabular-nums">{INR(totals.cgst9)}</td>
+                <td className="text-right px-2 py-2 tabular-nums">{INR(totals.sgst9)}</td>
                 <td className="text-right px-2 py-2 tabular-nums">{INR(totals.igst18)}</td>
                 <td className="text-right px-2 py-2 text-emerald-700 tabular-nums">{INR(grandTotal)}</td>
                 <td colSpan={2} />
