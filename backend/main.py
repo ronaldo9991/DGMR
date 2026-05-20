@@ -35,7 +35,7 @@ def health():
 
 
 # Serve React SPA — must come AFTER API routes
-STATIC_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+STATIC_DIR = str(Path(__file__).resolve().parent.parent / "frontend" / "dist")
 INDEX_HTML = os.path.join(STATIC_DIR, "index.html")
 
 

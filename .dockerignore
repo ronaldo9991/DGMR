@@ -1,0 +1,23 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Git / CI
+.git/
+.gitignore
+.github/
+
+# Local env
+.env
+*.env
+
+# Claude worktrees
+.claude/
