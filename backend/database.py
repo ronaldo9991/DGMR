@@ -1,22 +1,31 @@
 import os
-from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-# Always use SQLite on the Railway persistent volume.
-# DB_PATH env var can override; defaults to /data/dgmr.db (Railway volume).
-# We deliberately ignore DATABASE_URL — that would point to an empty Postgres
-# instance and bypass the SQLite volume where all uploaded data lives.
-db_path = str(Path(os.getenv("DB_PATH", "/data/dgmr.db")).resolve())
-os.makedirs(os.path.dirname(db_path), exist_ok=True)
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-print(f"[DB] SQLite path: {db_path}", flush=True)
-
-engine = create_engine(
-    f"sqlite:///{db_path}",
-    connect_args={"check_same_thread": False},
-)
+if DATABASE_URL:
+    # Railway Postgres — fix the legacy postgres:// scheme
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    print(f"[DB] Using PostgreSQL", flush=True)
+    engine = create_engine(
+        DATABASE_URL,
+        pool_pre_ping=True,       # auto-reconnect on dropped connections
+        pool_size=5,
+        max_overflow=10,
+    )
+else:
+    # Local development only — SQLite
+    from pathlib import Path
+    db_path = str(Path(os.getenv("DB_PATH", "dgmr.db")).resolve())
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    print(f"[DB] Using SQLite at: {db_path}", flush=True)
+    engine = create_engine(
+        f"sqlite:///{db_path}",
+        connect_args={"check_same_thread": False},
+    )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
