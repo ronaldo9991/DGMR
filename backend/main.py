@@ -34,6 +34,26 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/api/debug/db")
+def debug_db():
+    """Shows exactly which database file is in use and how many records exist."""
+    from sqlalchemy import text
+    from database import engine, db_path
+    db_file = db_path
+    exists = os.path.exists(db_file)
+    size_kb = round(os.path.getsize(db_file) / 1024, 1) if exists else 0
+    with engine.connect() as conn:
+        row_count = conn.execute(text("SELECT COUNT(*) FROM invoices")).scalar()
+    return {
+        "db_path": db_file,
+        "file_exists": exists,
+        "file_size_kb": size_kb,
+        "row_count": row_count,
+        "database_url_env": os.getenv("DATABASE_URL", "(not set — good)"),
+        "db_path_env": os.getenv("DB_PATH", "(not set — using default /data/dgmr.db)"),
+    }
+
+
 # Serve React SPA — must come AFTER API routes
 STATIC_DIR = str(Path(__file__).resolve().parent.parent / "frontend" / "dist")
 INDEX_HTML = os.path.join(STATIC_DIR, "index.html")
