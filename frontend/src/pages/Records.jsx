@@ -164,6 +164,7 @@ export default function Records() {
   const [selectedYear,    setSelectedYear]    = useState("All");
   const [selectedMonth,   setSelectedMonth]   = useState("All");
   const [dateOptions,     setDateOptions]     = useState([]);  // [{year, months:[]}]
+  const [allForCount,     setAllForCount]     = useState([]);
 
   // Load available years/months from data
   useEffect(() => {
@@ -201,7 +202,6 @@ export default function Records() {
     load();
   };
 
-  const [allForCount, setAllForCount] = useState([]);
   useEffect(() => {
     axios.get("/api/records?limit=5000&cancelled=false")
       .then((r) => setAllForCount(r.data.records));
