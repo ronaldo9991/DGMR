@@ -1,7 +1,30 @@
+import { Component } from "react";
 import { BrowserRouter, Routes, Route, NavLink } from "react-router-dom";
 import Dashboard from "./pages/Dashboard.jsx";
 import Upload from "./pages/Upload.jsx";
 import Records from "./pages/Records.jsx";
+
+class ErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { error: null }; }
+  static getDerivedStateFromError(err) { return { error: err }; }
+  render() {
+    if (this.state.error) return (
+      <div className="min-h-screen flex items-center justify-center p-8 bg-red-50">
+        <div className="max-w-xl w-full bg-white rounded-2xl shadow-xl p-8 space-y-4">
+          <h1 className="text-xl font-bold text-red-600">Something went wrong</h1>
+          <pre className="text-xs bg-red-50 rounded-xl p-4 overflow-auto text-red-800 whitespace-pre-wrap">
+            {this.state.error?.message}{"\n\n"}{this.state.error?.stack}
+          </pre>
+          <button onClick={() => this.setState({ error: null })}
+            className="px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-semibold hover:bg-slate-700">
+            Try again
+          </button>
+        </div>
+      </div>
+    );
+    return this.props.children;
+  }
+}
 
 const NAV = [
   {
@@ -175,11 +198,13 @@ export default function App() {
         pt-14 md:pt-0
         pb-20 md:pb-0
       ">
-        <Routes>
-          <Route path="/"        element={<Dashboard />} />
-          <Route path="/upload"  element={<Upload />} />
-          <Route path="/records" element={<Records />} />
-        </Routes>
+        <ErrorBoundary>
+          <Routes>
+            <Route path="/"        element={<Dashboard />} />
+            <Route path="/upload"  element={<Upload />} />
+            <Route path="/records" element={<Records />} />
+          </Routes>
+        </ErrorBoundary>
       </main>
     </BrowserRouter>
   );

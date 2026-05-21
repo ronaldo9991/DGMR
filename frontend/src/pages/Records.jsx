@@ -152,6 +152,7 @@ function ClickCell({ label, value }) {
 const MONTH_NAMES = { "01":"Jan","02":"Feb","03":"Mar","04":"Apr","05":"May","06":"Jun","07":"Jul","08":"Aug","09":"Sep","10":"Oct","11":"Nov","12":"Dec" };
 
 export default function Records() {
+  // ── 1. ALL useState declarations (must come first, never conditional) ──
   const [records,         setRecords]         = useState([]);
   const [total,           setTotal]           = useState(0);
   const [loading,         setLoading]         = useState(true);
@@ -163,68 +164,67 @@ export default function Records() {
   const [deleting,        setDeleting]        = useState(null);
   const [selectedYear,    setSelectedYear]    = useState("All");
   const [selectedMonth,   setSelectedMonth]   = useState("All");
-  const [dateOptions,     setDateOptions]     = useState([]);  // [{year, months:[]}]
+  const [dateOptions,     setDateOptions]     = useState([]);
   const [allForCount,     setAllForCount]     = useState([]);
+  const [refreshKey,      setRefreshKey]      = useState(0);
 
-  // Load available years/months from data
-  useEffect(() => {
-    axios.get("/api/records/dates").then((r) => setDateOptions(r.data.dates || []));
-  }, []);
-
+  // ── 2. ALL useMemo declarations ──
   const availableMonths = useMemo(() => {
     if (selectedYear === "All") return [];
     const found = dateOptions.find((d) => d.year === selectedYear);
     return found ? found.months : [];
   }, [selectedYear, dateOptions]);
 
-  const load = () => {
+  // ── 3. ALL useEffect declarations ──
+  useEffect(() => {
+    axios.get("/api/records/dates").then((r) => setDateOptions(r.data.dates || []));
+  }, []);
+
+  useEffect(() => {
     setLoading(true);
     const p = new URLSearchParams({ limit: "2000" });
     if (activePlatform !== "All") p.set("platform", activePlatform);
     if (activePlatform === "Amazon" && activeWarehouse !== "All") p.set("warehouse", activeWarehouse);
     if (typeFilter !== "All") p.set("transaction_type", typeFilter);
-    if (search)                p.set("search", search);
-    if (!showCancelled)        p.set("cancelled", "false");
+    if (search)               p.set("search", search);
+    if (!showCancelled)       p.set("cancelled", "false");
     if (selectedYear !== "All") p.set("year", selectedYear);
     if (selectedMonth !== "All") p.set("month", selectedMonth);
     axios.get(`/api/records?${p}`)
       .then((r) => { setRecords(r.data.records); setTotal(r.data.total); })
       .finally(() => setLoading(false));
-  };
-
-  useEffect(() => { load(); }, [activePlatform, activeWarehouse, typeFilter, search, showCancelled, selectedYear, selectedMonth]);
-
-  const handleDelete = async (id) => {
-    if (!window.confirm("Delete this record?")) return;
-    setDeleting(id);
-    await axios.delete(`/api/records/${id}`);
-    setDeleting(null);
-    load();
-  };
+  }, [activePlatform, activeWarehouse, typeFilter, search, showCancelled, selectedYear, selectedMonth, refreshKey]);
 
   useEffect(() => {
     axios.get("/api/records?limit=5000&cancelled=false")
       .then((r) => setAllForCount(r.data.records));
   }, [records]);
 
-  // Plain computed variables — no useMemo needed since salesRows/returnRows
-  // change every render anyway (new array refs from .filter each time)
+  // ── 4. Helper functions (non-hooks) ──
+  const handleDelete = async (id) => {
+    if (!window.confirm("Delete this record?")) return;
+    setDeleting(id);
+    await axios.delete(`/api/records/${id}`);
+    setDeleting(null);
+    setRefreshKey((k) => k + 1);
+  };
+
+  // ── 5. Plain derived values (no hooks needed) ──
   const salesRows  = records.filter((r) => !r.cancelled && r.transaction_type === "Sale");
   const returnRows = records.filter((r) => !r.cancelled && r.transaction_type === "Return");
 
-  const sumRows = (rows) =>
-    rows.reduce(
-      (acc, r) => ({
-        taxable_value: acc.taxable_value + (r.taxable_value || 0),
-        cgst9:  acc.cgst9  + (r.cgst9  || 0),
-        sgst9:  acc.sgst9  + (r.sgst9  || 0),
-        igst18: acc.igst18 + (r.igst18 || 0),
-      }),
-      { taxable_value: 0, cgst9: 0, sgst9: 0, igst18: 0 }
-    );
+  const sumTotals = (rows) => rows.reduce(
+    (acc, r) => ({
+      taxable_value: acc.taxable_value + (r.taxable_value || 0),
+      cgst9:  acc.cgst9  + (r.cgst9  || 0),
+      sgst9:  acc.sgst9  + (r.sgst9  || 0),
+      igst18: acc.igst18 + (r.igst18 || 0),
+    }),
+    { taxable_value: 0, cgst9: 0, sgst9: 0, igst18: 0 }
+  );
 
-  const salesTotals  = sumRows(salesRows);
-  const returnTotals = sumRows(returnRows);
+  const salesTotals  = sumTotals(salesRows);
+  const returnTotals = sumTotals(returnRows);
 
   const totals = {
     taxable_value: salesTotals.taxable_value - returnTotals.taxable_value,
@@ -233,10 +233,8 @@ export default function Records() {
     igst18: salesTotals.igst18 - returnTotals.igst18,
   };
 
-  // Plain computed object (no useMemo) — avoids hook index corruption in minified builds
-  const tabCountsObj = { All: allForCount.length };
-  allForCount.forEach((r) => { if (r.platform) tabCountsObj[r.platform] = (tabCountsObj[r.platform] || 0) + 1; });
-  const tabCounts = tabCountsObj;
+  const tabCounts = { All: allForCount.length };
+  allForCount.forEach((r) => { if (r.platform) tabCounts[r.platform] = (tabCounts[r.platform] || 0) + 1; });
 
   const grandTotal = totals.taxable_value + totals.cgst9 + totals.sgst9 + totals.igst18;
 
