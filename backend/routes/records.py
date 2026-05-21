@@ -141,13 +141,15 @@ def fix_warehouses(db: Session = Depends(get_db)):
     for inv in rows:
         if not inv.inv_no:
             continue
-        upper = inv.inv_no.upper()
+        # Normalize: remove spaces so "CJ B1-15" matches "CJB1"
+        upper_nospace = inv.inv_no.upper().replace(" ", "")
         correct = None
         for code in ("MAA4", "CJB1"):
-            if code in upper:
+            if code in upper_nospace:
                 correct = code
                 break
         if correct is None:
+            upper = inv.inv_no.upper()
             if upper.startswith("IN-") or upper.startswith("IN ") or upper == "IN":
                 correct = "IN"
             else:

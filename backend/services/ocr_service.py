@@ -59,24 +59,25 @@ def _detect_warehouse(platform: Optional[str], warehouse_raw: Optional[str], inv
     """
     if not platform or platform.lower() != "amazon":
         return None
-    # 1. Scan invoice number first — most reliable signal
-    #    Check specific codes before "IN" to avoid false matches
+    # 1. Scan invoice number first — most reliable signal.
+    #    Normalize: remove spaces so "CJ B1-15" matches "CJB1"
     if inv_no:
-        upper = inv_no.upper()
-        for code in ("MAA4", "CJB1"):  # specific codes first
-            if code in upper:
+        upper_nospace = inv_no.upper().replace(" ", "")
+        for code in ("MAA4", "CJB1"):
+            if code in upper_nospace:
                 return code
-        # Only accept "IN" from inv_no if it appears as a standalone prefix (e.g. "IN-123")
+        # Accept "IN" only as a clear prefix (e.g. "IN-123")
+        upper = inv_no.upper()
         if upper.startswith("IN-") or upper.startswith("IN ") or upper == "IN":
             return "IN"
-    # 2. Trust GPT warehouse if it's a specific code (not the ambiguous "IN")
+    # 2. Trust GPT warehouse for specific codes
     if warehouse_raw:
-        wh = warehouse_raw.upper()
+        wh = warehouse_raw.upper().replace(" ", "")
         if wh in ("MAA4", "CJB1"):
             return wh
         if wh == "IN":
             return "IN"
-    return "IN"  # default Amazon warehouse when code not found
+    return "IN"  # default
 
 
 @dataclass
