@@ -259,7 +259,7 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="overflow-x-auto scrollbar-hide">
-            <PlatformTabs active={activePlatform} onChange={setActivePlatform} counts={tabCounts} />
+            <PlatformTabs active={activePlatform} onChange={setActivePlatform} />
           </div>
           <div className="mt-4">
             <MonthlyBarChart data={filteredMonths} platform={activePlatform} />
