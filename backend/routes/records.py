@@ -130,3 +130,30 @@ def delete_record(record_id: int, db: Session = Depends(get_db)):
     db.delete(inv)
     db.commit()
     return {"deleted": True, "id": record_id}
+
+
+@router.post("/records/fix-warehouses")
+def fix_warehouses(db: Session = Depends(get_db)):
+    """One-time fix: re-detect warehouse from inv_no for Amazon records.
+    CJB1/MAA4 invoices that were mis-tagged as IN get corrected."""
+    rows = db.query(Invoice).filter(Invoice.platform == "Amazon").all()
+    fixed = 0
+    for inv in rows:
+        if not inv.inv_no:
+            continue
+        upper = inv.inv_no.upper()
+        correct = None
+        for code in ("MAA4", "CJB1"):
+            if code in upper:
+                correct = code
+                break
+        if correct is None:
+            if upper.startswith("IN-") or upper.startswith("IN ") or upper == "IN":
+                correct = "IN"
+            else:
+                correct = "IN"  # default
+        if inv.warehouse != correct:
+            inv.warehouse = correct
+            fixed += 1
+    db.commit()
+    return {"fixed": fixed, "total_amazon": len(rows)}
