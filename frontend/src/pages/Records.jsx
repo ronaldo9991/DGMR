@@ -207,12 +207,8 @@ export default function Records() {
       .then((r) => setAllForCount(r.data.records));
   }, [records]);
 
-  const tabCounts = useMemo(() => {
-    const c = { All: allForCount.length };
-    allForCount.forEach((r) => { if (r.platform) c[r.platform] = (c[r.platform] || 0) + 1; });
-    return c;
-  }, [allForCount]);
-
+  // Plain computed variables — no useMemo needed since salesRows/returnRows
+  // change every render anyway (new array refs from .filter each time)
   const salesRows  = records.filter((r) => !r.cancelled && r.transaction_type === "Sale");
   const returnRows = records.filter((r) => !r.cancelled && r.transaction_type === "Return");
 
@@ -227,15 +223,20 @@ export default function Records() {
       { taxable_value: 0, cgst9: 0, sgst9: 0, igst18: 0 }
     );
 
-  const salesTotals  = useMemo(() => sumRows(salesRows),  [salesRows]);
-  const returnTotals = useMemo(() => sumRows(returnRows), [returnRows]);
+  const salesTotals  = sumRows(salesRows);
+  const returnTotals = sumRows(returnRows);
 
-  const totals = useMemo(() => ({
+  const totals = {
     taxable_value: salesTotals.taxable_value - returnTotals.taxable_value,
     cgst9:  salesTotals.cgst9  - returnTotals.cgst9,
     sgst9:  salesTotals.sgst9  - returnTotals.sgst9,
     igst18: salesTotals.igst18 - returnTotals.igst18,
-  }), [salesTotals, returnTotals]);
+  };
+
+  // Plain computed object (no useMemo) — avoids hook index corruption in minified builds
+  const tabCountsObj = { All: allForCount.length };
+  allForCount.forEach((r) => { if (r.platform) tabCountsObj[r.platform] = (tabCountsObj[r.platform] || 0) + 1; });
+  const tabCounts = tabCountsObj;
 
   const grandTotal = totals.taxable_value + totals.cgst9 + totals.sgst9 + totals.igst18;
 
