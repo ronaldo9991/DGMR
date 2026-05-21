@@ -165,7 +165,7 @@ export default function Records() {
   const [selectedYear,    setSelectedYear]    = useState("All");
   const [selectedMonth,   setSelectedMonth]   = useState("All");
   const [dateOptions,     setDateOptions]     = useState([]);
-  const [allForCount,     setAllForCount]     = useState([]);
+  const [tabCounts,       setTabCounts]       = useState({ All: 0 });
   const [refreshKey,      setRefreshKey]      = useState(0);
 
   // ── 2. ALL useMemo declarations ──
@@ -196,8 +196,14 @@ export default function Records() {
   }, [activePlatform, activeWarehouse, typeFilter, search, showCancelled, selectedYear, selectedMonth, refreshKey]);
 
   useEffect(() => {
-    axios.get("/api/records?limit=5000&cancelled=false")
-      .then((r) => setAllForCount(r.data.records));
+    axios.get("/api/records?limit=5000&cancelled=false").then((r) => {
+      const rows = r.data.records || [];
+      const c = { All: rows.length };
+      rows.forEach((rec) => {
+        if (rec.platform) c[rec.platform] = (c[rec.platform] || 0) + 1;
+      });
+      setTabCounts(c);
+    });
   }, [records]);
 
   // ── 4. Helper functions (non-hooks) ──
@@ -233,8 +239,6 @@ export default function Records() {
     igst18: salesTotals.igst18 - returnTotals.igst18,
   };
 
-  const tabCounts = { All: allForCount.length };
-  allForCount.forEach((r) => { if (r.platform) tabCounts[r.platform] = (tabCounts[r.platform] || 0) + 1; });
 
   const grandTotal = totals.taxable_value + totals.cgst9 + totals.sgst9 + totals.igst18;
 
