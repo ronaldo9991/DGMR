@@ -149,6 +149,8 @@ function ClickCell({ label, value }) {
   );
 }
 
+const MONTH_NAMES = { "01":"Jan","02":"Feb","03":"Mar","04":"Apr","05":"May","06":"Jun","07":"Jul","08":"Aug","09":"Sep","10":"Oct","11":"Nov","12":"Dec" };
+
 export default function Records() {
   const [records,         setRecords]         = useState([]);
   const [total,           setTotal]           = useState(0);
@@ -159,21 +161,37 @@ export default function Records() {
   const [typeFilter,      setTypeFilter]      = useState("All");
   const [showCancelled,   setShowCancelled]   = useState(false);
   const [deleting,        setDeleting]        = useState(null);
+  const [selectedYear,    setSelectedYear]    = useState("All");
+  const [selectedMonth,   setSelectedMonth]   = useState("All");
+  const [dateOptions,     setDateOptions]     = useState([]);  // [{year, months:[]}]
+
+  // Load available years/months from data
+  useEffect(() => {
+    axios.get("/api/records/dates").then((r) => setDateOptions(r.data.dates || []));
+  }, []);
+
+  const availableMonths = useMemo(() => {
+    if (selectedYear === "All") return [];
+    const found = dateOptions.find((d) => d.year === selectedYear);
+    return found ? found.months : [];
+  }, [selectedYear, dateOptions]);
 
   const load = () => {
     setLoading(true);
-    const p = new URLSearchParams({ limit: "500" });
+    const p = new URLSearchParams({ limit: "2000" });
     if (activePlatform !== "All") p.set("platform", activePlatform);
     if (activePlatform === "Amazon" && activeWarehouse !== "All") p.set("warehouse", activeWarehouse);
     if (typeFilter !== "All") p.set("transaction_type", typeFilter);
-    if (search)               p.set("search", search);
-    if (!showCancelled)       p.set("cancelled", "false");
+    if (search)                p.set("search", search);
+    if (!showCancelled)        p.set("cancelled", "false");
+    if (selectedYear !== "All") p.set("year", selectedYear);
+    if (selectedMonth !== "All") p.set("month", selectedMonth);
     axios.get(`/api/records?${p}`)
       .then((r) => { setRecords(r.data.records); setTotal(r.data.total); })
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, [activePlatform, activeWarehouse, typeFilter, search, showCancelled]);
+  useEffect(() => { load(); }, [activePlatform, activeWarehouse, typeFilter, search, showCancelled, selectedYear, selectedMonth]);
 
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this record?")) return;
@@ -239,12 +257,24 @@ export default function Records() {
             {returnRows.length > 0 && ` · ${returnRows.length} returns`}
           </p>
         </div>
-        <a href="/api/excel" download className="btn-primary text-xs px-3 py-1.5">
+        <a
+          href={`/api/excel${selectedYear !== "All" || selectedMonth !== "All"
+            ? `?${new URLSearchParams({
+                ...(selectedYear !== "All" && { year: selectedYear }),
+                ...(selectedMonth !== "All" && { month: selectedMonth }),
+                ...(activePlatform !== "All" && { platform: activePlatform }),
+              })}`
+            : activePlatform !== "All" ? `?platform=${activePlatform}` : ""}`}
+          download
+          className="btn-primary text-xs px-3 py-1.5"
+        >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
           </svg>
-          <span className="hidden sm:inline">Download Excel</span>
+          <span className="hidden sm:inline">
+            {selectedYear !== "All" ? `Excel ${selectedYear}${selectedMonth !== "All" ? ` ${MONTH_NAMES[selectedMonth]}` : ""}` : "Download Excel"}
+          </span>
           <span className="sm:hidden">Excel</span>
         </a>
       </div>
@@ -280,6 +310,53 @@ export default function Records() {
               className="ml-1 text-xs font-semibold px-3 py-1 rounded-full border border-blue-300 text-blue-700 hover:bg-blue-50 transition-colors">
               ⬇ {activeWarehouse} Excel
             </a>
+          )}
+        </div>
+      )}
+
+      {/* ── Year / Month filter ── */}
+      {dateOptions.length > 0 && (
+        <div className="space-y-2">
+          {/* Year row */}
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-bold uppercase tracking-widest text-slate-400 w-12">Year</span>
+            <button
+              onClick={() => { setSelectedYear("All"); setSelectedMonth("All"); }}
+              className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-all ${
+                selectedYear === "All" ? "bg-slate-900 text-white border-slate-900" : "bg-white border-slate-200 text-slate-500 hover:border-slate-400"
+              }`}
+            >All</button>
+            {dateOptions.map(({ year }) => (
+              <button
+                key={year}
+                onClick={() => { setSelectedYear(year); setSelectedMonth("All"); }}
+                className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-all ${
+                  selectedYear === year ? "bg-indigo-600 text-white border-indigo-600" : "bg-white border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-700"
+                }`}
+              >{year}</button>
+            ))}
+          </div>
+
+          {/* Month row — only shown when a year is selected */}
+          {selectedYear !== "All" && availableMonths.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-bold uppercase tracking-widest text-slate-400 w-12">Month</span>
+              <button
+                onClick={() => setSelectedMonth("All")}
+                className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-all ${
+                  selectedMonth === "All" ? "bg-slate-700 text-white border-slate-700" : "bg-white border-slate-200 text-slate-500 hover:border-slate-400"
+                }`}
+              >All</button>
+              {availableMonths.map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setSelectedMonth(m)}
+                  className={`text-xs font-bold px-3 py-1.5 rounded-full border transition-all ${
+                    selectedMonth === m ? "bg-indigo-500 text-white border-indigo-500" : "bg-white border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-700"
+                  }`}
+                >{MONTH_NAMES[m] ?? m}</button>
+              ))}
+            </div>
           )}
         </div>
       )}

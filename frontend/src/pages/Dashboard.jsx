@@ -73,6 +73,7 @@ export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activePlatform, setActivePlatform] = useState("All");
+  const [selectedYear, setSelectedYear] = useState("All");
   const [refreshing, setRefreshing] = useState(false);
 
   const load = (quiet = false) => {
@@ -83,20 +84,35 @@ export default function Dashboard() {
   };
   useEffect(() => { load(); }, []);
 
-  const tabCounts = useMemo(() => {
-    if (!stats) return {};
-    const c = { All: stats.total_invoices };
-    stats.platforms?.forEach((p) => { c[p.name] = p.count; });
-    return c;
+  // Unique years from by_month data, descending
+  const availableYears = useMemo(() => {
+    if (!stats?.by_month) return [];
+    const years = [...new Set(stats.by_month.map((m) => m.month.split("-")[0]))];
+    return years.sort((a, b) => b.localeCompare(a));
   }, [stats]);
 
+  // Months filtered by selected year (and platform)
   const filteredMonths = useMemo(() => {
     if (!stats) return [];
-    if (activePlatform === "All") return stats.by_month;
-    return stats.by_month
-      .map((m) => ({ ...m, platforms: m.platforms }))
-      .filter((m) => (m.platforms?.[activePlatform] || 0) > 0);
-  }, [stats, activePlatform]);
+    let months = stats.by_month;
+    if (selectedYear !== "All") months = months.filter((m) => m.month.startsWith(selectedYear));
+    if (activePlatform !== "All") months = months.filter((m) => (m.platforms?.[activePlatform] || 0) > 0);
+    return months;
+  }, [stats, activePlatform, selectedYear]);
+
+  // Year-level totals (or all-time if "All")
+  const yearTotals = useMemo(() => {
+    const source = selectedYear === "All" ? stats?.by_month ?? [] : filteredMonths;
+    return source.reduce(
+      (acc, m) => ({
+        sales_total:   acc.sales_total   + m.sales_total,
+        returns_total: acc.returns_total + m.returns_total,
+        sales_count:   acc.sales_count   + m.sales_count,
+        returns_count: acc.returns_count + m.returns_count,
+      }),
+      { sales_total: 0, returns_total: 0, sales_count: 0, returns_count: 0 }
+    );
+  }, [filteredMonths, selectedYear, stats]);
 
   const filteredStates = useMemo(() => {
     if (!stats) return [];
@@ -140,6 +156,44 @@ export default function Dashboard() {
           </a>
         </div>
       </div>
+
+      {/* ── Year selector ── */}
+      {availableYears.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Year</span>
+          <button
+            onClick={() => setSelectedYear("All")}
+            className={`text-xs font-bold px-4 py-1.5 rounded-full border transition-all ${
+              selectedYear === "All" ? "bg-slate-900 text-white border-slate-900" : "bg-white border-slate-200 text-slate-500 hover:border-slate-400"
+            }`}
+          >All Time</button>
+          {availableYears.map((y) => (
+            <button key={y} onClick={() => setSelectedYear(y)}
+              className={`text-xs font-bold px-4 py-1.5 rounded-full border transition-all ${
+                selectedYear === y ? "bg-indigo-600 text-white border-indigo-600" : "bg-white border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-indigo-700"
+              }`}
+            >{y}</button>
+          ))}
+        </div>
+      )}
+
+      {/* ── Year summary strip (only when a year is selected) ── */}
+      {selectedYear !== "All" && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {[
+            { label: `${selectedYear} Sales`, value: INR(yearTotals.sales_total),   sub: `${yearTotals.sales_count} invoices`,   cls: "border-emerald-200 bg-emerald-50", val: "text-emerald-700" },
+            { label: `${selectedYear} Returns`, value: INR(yearTotals.returns_total), sub: `${yearTotals.returns_count} invoices`, cls: "border-rose-200 bg-rose-50",       val: "text-rose-700" },
+            { label: "Net Revenue",  value: INR(yearTotals.sales_total - yearTotals.returns_total), sub: "Sales − Returns", cls: "border-indigo-200 bg-indigo-50", val: "text-indigo-700 font-extrabold" },
+            { label: "Active Months", value: filteredMonths.length, sub: `months in ${selectedYear}`, cls: "border-slate-200 bg-slate-50", val: "text-slate-700" },
+          ].map((s) => (
+            <div key={s.label} className={`rounded-2xl border-2 px-4 py-3 ${s.cls}`}>
+              <p className="text-xs font-semibold text-slate-500">{s.label}</p>
+              <p className={`text-lg font-bold mt-0.5 ${s.val}`}>{s.value}</p>
+              <p className="text-xs text-slate-400 mt-0.5">{s.sub}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Platform cards */}
       {(amazonData || flipkartData) && (

@@ -8,6 +8,19 @@ from models import Invoice
 router = APIRouter()
 
 
+def _parse_date(inv_date):
+    """Parse DD.MM.YYYY or DD/MM/YYYY → (year_str, month_str_padded) or (None, None)."""
+    if not inv_date:
+        return None, None
+    parts = str(inv_date).replace("/", ".").split(".")
+    if len(parts) == 3:
+        try:
+            return str(parts[2]).strip(), str(parts[1]).strip().zfill(2)
+        except Exception:
+            pass
+    return None, None
+
+
 def _serialize(inv) -> dict:
     return {
         "id": inv.id,
@@ -32,15 +45,42 @@ def _serialize(inv) -> dict:
     }
 
 
+@router.get("/records/dates")
+def available_dates(db: Session = Depends(get_db)):
+    """Returns all unique years and year-month pairs present in the data."""
+    rows = (
+        db.query(Invoice.inv_date)
+        .filter(Invoice.status == "processed", Invoice.cancelled == False)
+        .all()
+    )
+    year_months: dict = {}   # year → set of month strings
+    for (inv_date,) in rows:
+        y, m = _parse_date(inv_date)
+        if y:
+            year_months.setdefault(y, set())
+            if m:
+                year_months[y].add(m)
+
+    result = []
+    for y in sorted(year_months.keys(), reverse=True):
+        result.append({
+            "year": y,
+            "months": sorted(year_months[y]),
+        })
+    return {"dates": result}
+
+
 @router.get("/records")
 def list_records(
     skip: int = 0,
-    limit: int = 500,
+    limit: int = 1000,
     platform: Optional[str] = None,
     warehouse: Optional[str] = None,
     transaction_type: Optional[str] = None,
     cancelled: Optional[bool] = None,
     search: Optional[str] = None,
+    year: Optional[str] = None,    # e.g. "2026"
+    month: Optional[str] = None,   # e.g. "04"
     db: Session = Depends(get_db),
 ):
     q = db.query(Invoice).filter(Invoice.status == "processed")
@@ -60,8 +100,25 @@ def list_records(
             | Invoice.gst_number.ilike(like)
             | Invoice.party_address.ilike(like)
         )
-    total = q.count()
-    rows = q.order_by(Invoice.inv_no.asc(), Invoice.id).offset(skip).limit(limit).all()
+
+    if year or month:
+        # Fetch all matching rows and filter by parsed date in Python
+        # (inv_date is a free-text string from OCR so SQL LIKE isn't reliable)
+        all_rows = q.order_by(Invoice.inv_no.asc(), Invoice.id).all()
+        filtered = []
+        for r in all_rows:
+            y_val, m_val = _parse_date(r.inv_date)
+            if year and y_val != year:
+                continue
+            if month and m_val != month:
+                continue
+            filtered.append(r)
+        total = len(filtered)
+        rows = filtered[skip: skip + limit]
+    else:
+        total = q.count()
+        rows = q.order_by(Invoice.inv_no.asc(), Invoice.id).offset(skip).limit(limit).all()
+
     return {"total": total, "records": [_serialize(r) for r in rows]}
 
 
