@@ -6,6 +6,7 @@ from fastapi import FastAPI
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from database import engine, Base
@@ -22,26 +23,30 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── API routes (must be registered BEFORE the static mount) ──────────────
+# ── API routes (registered BEFORE anything else) ─────────────────────────
 app.include_router(upload.router, prefix="/api")
 app.include_router(records.router, prefix="/api")
 app.include_router(excel.router, prefix="/api")
 app.include_router(stats.router, prefix="/api")
 
-
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
 
+# ── Static assets (JS / CSS bundles under /assets/) ──────────────────────
+STATIC_DIR = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+ASSETS_DIR = STATIC_DIR / "assets"
 
-# ── React SPA — registered last so API routes always win ─────────────────
-# StaticFiles with html=True serves index.html for ANY path that doesn't
-# match a real file — this is the correct SPA reload fix.
-STATIC_DIR = str(Path(__file__).resolve().parent.parent / "frontend" / "dist")
+if ASSETS_DIR.exists():
+    app.mount("/assets", StaticFiles(directory=str(ASSETS_DIR)), name="assets")
 
-if os.path.exists(STATIC_DIR):
-    app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
-else:
-    @app.get("/")
-    def root():
-        return {"service": "DGMR TECH OCR Dashboard API", "status": "ok"}
+# ── SPA catch-all: serve index.html for every non-API path ───────────────
+# This is the correct way to handle React Router / BrowserRouter in FastAPI.
+# The /{full_path:path} route matches /, /records, /upload, etc.
+INDEX_HTML = STATIC_DIR / "index.html"
+
+@app.get("/{full_path:path}")
+async def serve_spa(full_path: str):
+    if INDEX_HTML.exists():
+        return FileResponse(str(INDEX_HTML))
+    return {"service": "DGMR TECH OCR Dashboard API", "status": "ok"}
