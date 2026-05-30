@@ -9,15 +9,42 @@ router = APIRouter()
 
 
 def _parse_date(inv_date):
-    """Parse DD.MM.YYYY or DD/MM/YYYY → (year_str, month_str_padded) or (None, None)."""
+    """Parse any OCR date format → (year_str, month_str_padded) or (None, None).
+
+    Handles: DD.MM.YYYY, DD.MM.YY, DD/MM/YYYY, DD/MM/YY,
+             DD-MM-YYYY, DD-MM-YYYY HH:MM …, DD-Mon-YY
+    """
     if not inv_date:
         return None, None
-    parts = str(inv_date).replace("/", ".").split(".")
-    if len(parts) == 3:
+    import re as _re
+    from datetime import datetime as _dt
+
+    s = str(inv_date).strip()
+    # Strip time: "27-04-2026, 08:38 AM" → "27-04-2026"
+    s = _re.split(r",\s*\d", s)[0].strip()
+
+    # Named-month formats, e.g. "01-Apr-26"
+    for fmt in ("%d-%b-%y", "%d-%b-%Y", "%d %b %y", "%d %b %Y"):
         try:
-            return str(parts[2]).strip(), str(parts[1]).strip().zfill(2)
-        except Exception:
+            dt = _dt.strptime(s, fmt)
+            return str(dt.year), str(dt.month).zfill(2)
+        except ValueError:
             pass
+
+    # Numeric-only
+    for sep in (".", "/", "-"):
+        if sep not in s:
+            continue
+        parts = [p.strip() for p in s.split(sep)]
+        if len(parts) != 3:
+            continue
+        d, m, y = parts[0], parts[1], parts[2]
+        if len(y) == 2 and y.isdigit():
+            y = "20" + y
+        if len(y) == 4 and y.isdigit() and m.isdigit() and 1 <= int(m) <= 12:
+            return y, m.zfill(2)
+        break
+
     return None, None
 
 

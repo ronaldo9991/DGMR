@@ -51,14 +51,49 @@ def _extract_state(address: str) -> str:
 
 
 def _month_key(inv_date: str) -> str:
+    """Robustly parse any OCR date format → 'YYYY-MM', else 'Unknown'.
+
+    Handles all formats seen in the DB:
+      DD.MM.YYYY           20.04.2026
+      DD.MM.YY             29.06.22
+      DD/MM/YYYY           26/04/2021
+      DD/MM/YY             02/04/26
+      DD-MM-YYYY           27-04-2026
+      DD-MM-YYYY, HH:MM …  27-04-2026, 08:38 AM
+      DD-Mon-YY            01-Apr-26
+      D.M.YYYY             13.4.2022
+    """
     if not inv_date:
         return "Unknown"
-    parts = str(inv_date).replace("/", ".").split(".")
-    if len(parts) == 3:
+
+    from datetime import datetime as _dt
+
+    s = str(inv_date).strip()
+    # Strip time portion: "27-04-2026, 08:38 AM" → "27-04-2026"
+    s = re.split(r",\s*\d", s)[0].strip()
+
+    # Named-month formats, e.g. "01-Apr-26"
+    for fmt in ("%d-%b-%y", "%d-%b-%Y", "%d %b %y", "%d %b %Y"):
         try:
-            return f"{parts[2]}-{parts[1].zfill(2)}"
-        except Exception:
+            return _dt.strptime(s, fmt).strftime("%Y-%m")
+        except ValueError:
             pass
+
+    # Numeric-only: try each separator in priority order
+    for sep in (".", "/", "-"):
+        if sep not in s:
+            continue
+        parts = [p.strip() for p in s.split(sep)]
+        if len(parts) != 3:
+            continue
+        d, m, y = parts[0], parts[1], parts[2]
+        # Expand 2-digit year: "22" → "2022", "26" → "2026"
+        if len(y) == 2 and y.isdigit():
+            y = "20" + y
+        if len(y) == 4 and y.isdigit() and m.isdigit() and 1 <= int(m) <= 12:
+            return f"{y}-{m.zfill(2)}"
+        break  # separator found but parts invalid — don't try next sep
+
     return "Unknown"
 
 
