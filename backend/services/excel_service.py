@@ -7,15 +7,39 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
-HEADERS = [
-    "QTY", "TYPE", "PARTY NAME", "GST NUMBER", "INV NO", "INV DATE",
-    "TAXABLE VALUE", "CGST9", "SGST9", "IGST18", "TOTAL AMOUNT", "PARTY ADDRESS",
+# Column spec: (HEADER, field, width). "_total_amount" is computed.
+# The WAREHOUSE column is inserted only for sheets that contain Amazon rows
+# (Flipkart / Other platforms have no warehouse) — see _columns().
+_BASE_COLS = [
+    ("QTY",           "qty",               6),
+    ("TYPE",          "transaction_type",  10),
+    ("PARTY NAME",    "party_name",        28),
+    ("GST NUMBER",    "gst_number",        18),
+    ("INV NO",        "inv_no",            28),
+    ("INV DATE",      "inv_date",          12),
+    ("TAXABLE VALUE", "taxable_value",     16),
+    ("CGST9",         "cgst9",             12),
+    ("SGST9",         "sgst9",             12),
+    ("IGST18",        "igst18",            12),
+    ("TOTAL AMOUNT",  "_total_amount",     16),
+    ("PARTY ADDRESS", "party_address",     22),
 ]
-FIELDS = [
-    "qty", "transaction_type", "party_name", "gst_number", "inv_no", "inv_date",
-    "taxable_value", "cgst9", "sgst9", "igst18", "_total_amount", "party_address",
-]
-NUM_COLS = {7, 8, 9, 10, 11}   # 1-indexed: TAXABLE VALUE, CGST9, SGST9, IGST18, TOTAL AMOUNT
+_WAREHOUSE_COL = ("WAREHOUSE", "warehouse", 14)
+_NUM_HEADERS = {"TAXABLE VALUE", "CGST9", "SGST9", "IGST18", "TOTAL AMOUNT"}
+
+
+def _columns(show_warehouse: bool):
+    """Return (headers, fields, widths, num_cols_1indexed) for a sheet.
+    WAREHOUSE is slotted right after TYPE when requested."""
+    cols = list(_BASE_COLS)
+    if show_warehouse:
+        cols.insert(2, _WAREHOUSE_COL)   # after QTY, TYPE
+    headers = [c[0] for c in cols]
+    fields  = [c[1] for c in cols]
+    widths  = [c[2] for c in cols]
+    num_cols = {i for i, h in enumerate(headers, start=1) if h in _NUM_HEADERS}
+    return headers, fields, widths, num_cols
+
 
 TITLE_FONT   = Font(bold=True, size=13)
 HEADER_FONT  = Font(bold=True, size=11)
@@ -27,7 +51,6 @@ TOTAL_FONT   = Font(bold=True, size=11)
 TOTAL_FILL   = PatternFill("solid", fgColor="FFF2CC")
 THIN         = Side(style="thin", color="BFBFBF")
 BORDER       = Border(left=THIN, right=THIN, top=THIN, bottom=THIN)
-COL_WIDTHS   = [6, 10, 28, 18, 28, 12, 16, 12, 12, 12, 16, 22]
 
 AMAZON_WAREHOUSES   = ["IN", "MAA4", "CJB1"]
 WAREHOUSE_LABELS    = {"IN": "IN (India)", "MAA4": "MAA4 (Chennai)", "CJB1": "CJB1 (Coimbatore)"}
@@ -77,13 +100,15 @@ def _month_label(key: str) -> str:
     return f"{calendar.month_abbr[int(m)]} {y}"
 
 
-def _write_sheet(ws, invoices, title: str):
+def _write_sheet(ws, invoices, title: str, show_warehouse: bool = False):
+    headers, fields, widths, num_cols = _columns(show_warehouse)
+
     ws["A1"] = title
     ws["A1"].font = TITLE_FONT
     ws.row_dimensions[1].height = 22
     ws.row_dimensions[2].height = 6
 
-    for col_idx, header in enumerate(HEADERS, start=1):
+    for col_idx, header in enumerate(headers, start=1):
         cell = ws.cell(row=3, column=col_idx, value=header)
         cell.font = HEADER_FONT
         cell.fill = HEADER_FILL
@@ -92,6 +117,8 @@ def _write_sheet(ws, invoices, title: str):
     ws.row_dimensions[3].height = 28
     ws.row_dimensions[4].height = 6
 
+    type_col = headers.index("TYPE") + 1
+
     data_start = 5
     sorted_invs = sorted(invoices, key=_sort_key)
     for row_idx, inv in enumerate(sorted_invs, start=data_start):
@@ -99,7 +126,7 @@ def _write_sheet(ws, invoices, title: str):
         is_cancel = getattr(inv, "cancelled", False)
         row_fill  = RETURN_FILL if is_return else SALE_FILL
 
-        for col_idx, field in enumerate(FIELDS, start=1):
+        for col_idx, field in enumerate(fields, start=1):
             if field == "_total_amount":
                 tv = getattr(inv, "taxable_value", None) or 0
                 cg = getattr(inv, "cgst9", None) or 0
@@ -113,16 +140,16 @@ def _write_sheet(ws, invoices, title: str):
                 cell.fill = row_fill
             cell.border = BORDER
             cell.alignment = Alignment(vertical="center",
-                                       horizontal="right" if col_idx in NUM_COLS else "left")
+                                       horizontal="right" if col_idx in num_cols else "left")
             if is_cancel:
                 cell.font = CANCEL_FONT
-            elif is_return and col_idx == 2:
+            elif is_return and col_idx == type_col:
                 cell.font = Font(bold=True, color="CC0000")
-            if col_idx in NUM_COLS:
+            if col_idx in num_cols:
                 cell.number_format = "#,##0.00"
 
         if is_cancel:
-            ws.cell(row=row_idx, column=len(HEADERS) + 1, value="CANCEL").font = CANCEL_FONT
+            ws.cell(row=row_idx, column=len(headers) + 1, value="CANCEL").font = CANCEL_FONT
 
     data_end = data_start + len(sorted_invs) - 1
 
@@ -131,7 +158,7 @@ def _write_sheet(ws, invoices, title: str):
         ws.cell(row=tr, column=1, value="TOTAL").font = TOTAL_FONT
         ws.cell(row=tr, column=1).fill = TOTAL_FILL
         ws.cell(row=tr, column=1).alignment = Alignment(horizontal="center")
-        for col_idx in NUM_COLS:
+        for col_idx in num_cols:
             col_letter = get_column_letter(col_idx)
             cell = ws.cell(row=tr, column=col_idx,
                            value=f"=SUM({col_letter}{data_start}:{col_letter}{data_end})")
@@ -141,7 +168,7 @@ def _write_sheet(ws, invoices, title: str):
             cell.alignment = Alignment(horizontal="right", vertical="center")
             cell.border = BORDER
 
-    for col_idx, width in enumerate(COL_WIDTHS, start=1):
+    for col_idx, width in enumerate(widths, start=1):
         ws.column_dimensions[get_column_letter(col_idx)].width = width
     ws.freeze_panes = f"A{data_start}"
 
@@ -158,7 +185,9 @@ def build_excel(invoices) -> bytes:
         if first:
             ws.title = title
             first = False
-        _write_sheet(ws, rows, header)
+        # WAREHOUSE column only when the sheet actually holds Amazon invoices
+        show_wh = any((getattr(r, "platform", "") or "") == "Amazon" for r in rows)
+        _write_sheet(ws, rows, header, show_warehouse=show_wh)
 
     # ── Group data ───────────────────────────────────────────────────────
     by_platform: dict = defaultdict(list)
