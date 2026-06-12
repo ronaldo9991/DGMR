@@ -247,25 +247,29 @@ export default function Records() {
   // Column spans for tfoot (before amount cols): Platform, [WH], Type, QTY, Party, GST No, INV No, Date
   const preAmtCols = showWarehouse ? 8 : 7;
 
-  // Build Excel download URL that mirrors every active filter
-  const buildExcelUrl = (warehouseOverride) => {
+  // Build Excel download URL that mirrors every active filter.
+  // Pass { type: "Sale" } or { type: "Return" } for a type-only workbook,
+  // and { warehouse } to override the warehouse (per-warehouse button).
+  const buildExcelUrl = ({ warehouse, type } = {}) => {
     const p = new URLSearchParams();
     if (activePlatform !== "All") p.set("platform", activePlatform);
-    const wh = warehouseOverride ?? (activePlatform === "Amazon" && activeWarehouse !== "All" ? activeWarehouse : null);
+    const wh = warehouse ?? (activePlatform === "Amazon" && activeWarehouse !== "All" ? activeWarehouse : null);
     if (wh) p.set("warehouse", wh);
     if (selectedYear !== "All") p.set("year", selectedYear);
     if (selectedMonth !== "All") p.set("month", selectedMonth);
+    if (type) p.set("transaction_type", type);
     const qs = p.toString();
     return `/api/excel${qs ? `?${qs}` : ""}`;
   };
 
-  const excelLabel = () => {
+  // Suffix showing which filters are active, e.g. " — Amazon IN 2026 Apr"
+  const filterSuffix = () => {
     const parts = [];
     if (activePlatform !== "All") parts.push(activePlatform);
     if (activePlatform === "Amazon" && activeWarehouse !== "All") parts.push(activeWarehouse);
     if (selectedYear !== "All") parts.push(selectedYear);
     if (selectedMonth !== "All") parts.push(MONTH_NAMES[selectedMonth]);
-    return parts.length ? `Excel — ${parts.join(" ")}` : "Download Excel";
+    return parts.length ? ` — ${parts.join(" ")}` : "";
   };
 
   return (
@@ -281,18 +285,50 @@ export default function Records() {
             {returnRows.length > 0 && ` · ${returnRows.length} returns`}
           </p>
         </div>
-        <a
-          href={buildExcelUrl()}
-          download
-          className="btn-primary text-xs px-3 py-1.5"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-          </svg>
-          <span className="hidden sm:inline">{excelLabel()}</span>
-          <span className="sm:hidden">Excel</span>
-        </a>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Sales-only Excel */}
+          <a
+            href={buildExcelUrl({ type: "Sale" })}
+            download
+            title={`Download Sales${filterSuffix()}`}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Sales Excel
+          </a>
+
+          {/* Returns-only Excel */}
+          <a
+            href={buildExcelUrl({ type: "Return" })}
+            download
+            title={`Download Returns${filterSuffix()}`}
+            className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl border border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+            </svg>
+            Returns Excel
+          </a>
+
+          {/* All (sales + returns) */}
+          <a
+            href={buildExcelUrl()}
+            download
+            title={`Download all invoices${filterSuffix()}`}
+            className="btn-primary text-xs px-3 py-1.5"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            <span className="hidden sm:inline">All Excel</span>
+            <span className="sm:hidden">All</span>
+          </a>
+        </div>
       </div>
 
       {/* Platform tabs */}
@@ -322,10 +358,16 @@ export default function Records() {
             </button>
           ))}
           {activeWarehouse !== "All" && (
-            <a href={buildExcelUrl(activeWarehouse)} download
-              className="ml-1 text-xs font-semibold px-3 py-1 rounded-full border border-blue-300 text-blue-700 hover:bg-blue-50 transition-colors">
-              ⬇ {activeWarehouse} Excel
-            </a>
+            <div className="ml-1 flex items-center gap-1.5">
+              <a href={buildExcelUrl({ warehouse: activeWarehouse, type: "Sale" })} download
+                className="text-xs font-semibold px-2.5 py-1 rounded-full border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors">
+                ⬇ {activeWarehouse} Sales
+              </a>
+              <a href={buildExcelUrl({ warehouse: activeWarehouse, type: "Return" })} download
+                className="text-xs font-semibold px-2.5 py-1 rounded-full border border-rose-300 bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors">
+                ⬇ {activeWarehouse} Returns
+              </a>
+            </div>
           )}
         </div>
       )}

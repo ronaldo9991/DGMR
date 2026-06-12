@@ -17,6 +17,7 @@ def download_excel(
     warehouse: Optional[str] = None,
     year: Optional[str] = None,
     month: Optional[str] = None,
+    transaction_type: Optional[str] = None,   # "Sale" or "Return"
     db: Session = Depends(get_db),
 ):
     q = db.query(Invoice).filter(Invoice.status == "processed")
@@ -24,6 +25,12 @@ def download_excel(
         q = q.filter(Invoice.platform == platform)
     if warehouse:
         q = q.filter(Invoice.warehouse == warehouse)
+    if transaction_type:
+        # Sales/Returns-only download: drop cancelled too so the sheet is clean
+        q = q.filter(
+            Invoice.transaction_type == transaction_type,
+            Invoice.cancelled == False,
+        )
     invoices = q.order_by(Invoice.inv_no.asc(), Invoice.id).all()
 
     # Filter by year/month if requested
@@ -47,7 +54,10 @@ def download_excel(
         name_parts.append(year)
     if month:
         name_parts.append(month)
-    filename = "_".join(name_parts) + "_invoices.xlsx"
+    if transaction_type:
+        name_parts.append("sales" if transaction_type == "Sale" else "returns")
+    suffix = "_invoices.xlsx" if not transaction_type else ".xlsx"
+    filename = "_".join(name_parts) + suffix
 
     xlsx_bytes = build_excel(invoices)
     return Response(
