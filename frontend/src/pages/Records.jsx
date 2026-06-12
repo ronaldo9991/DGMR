@@ -247,6 +247,27 @@ export default function Records() {
   // Column spans for tfoot (before amount cols): Platform, [WH], Type, QTY, Party, GST No, INV No, Date
   const preAmtCols = showWarehouse ? 8 : 7;
 
+  // Build Excel download URL that mirrors every active filter
+  const buildExcelUrl = (warehouseOverride) => {
+    const p = new URLSearchParams();
+    if (activePlatform !== "All") p.set("platform", activePlatform);
+    const wh = warehouseOverride ?? (activePlatform === "Amazon" && activeWarehouse !== "All" ? activeWarehouse : null);
+    if (wh) p.set("warehouse", wh);
+    if (selectedYear !== "All") p.set("year", selectedYear);
+    if (selectedMonth !== "All") p.set("month", selectedMonth);
+    const qs = p.toString();
+    return `/api/excel${qs ? `?${qs}` : ""}`;
+  };
+
+  const excelLabel = () => {
+    const parts = [];
+    if (activePlatform !== "All") parts.push(activePlatform);
+    if (activePlatform === "Amazon" && activeWarehouse !== "All") parts.push(activeWarehouse);
+    if (selectedYear !== "All") parts.push(selectedYear);
+    if (selectedMonth !== "All") parts.push(MONTH_NAMES[selectedMonth]);
+    return parts.length ? `Excel — ${parts.join(" ")}` : "Download Excel";
+  };
+
   return (
     <div className="p-4 sm:p-6 md:p-8 space-y-4 sm:space-y-6">
 
@@ -261,13 +282,7 @@ export default function Records() {
           </p>
         </div>
         <a
-          href={`/api/excel${selectedYear !== "All" || selectedMonth !== "All"
-            ? `?${new URLSearchParams({
-                ...(selectedYear !== "All" && { year: selectedYear }),
-                ...(selectedMonth !== "All" && { month: selectedMonth }),
-                ...(activePlatform !== "All" && { platform: activePlatform }),
-              })}`
-            : activePlatform !== "All" ? `?platform=${activePlatform}` : ""}`}
+          href={buildExcelUrl()}
           download
           className="btn-primary text-xs px-3 py-1.5"
         >
@@ -275,9 +290,7 @@ export default function Records() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
           </svg>
-          <span className="hidden sm:inline">
-            {selectedYear !== "All" ? `Excel ${selectedYear}${selectedMonth !== "All" ? ` ${MONTH_NAMES[selectedMonth]}` : ""}` : "Download Excel"}
-          </span>
+          <span className="hidden sm:inline">{excelLabel()}</span>
           <span className="sm:hidden">Excel</span>
         </a>
       </div>
@@ -309,7 +322,7 @@ export default function Records() {
             </button>
           ))}
           {activeWarehouse !== "All" && (
-            <a href={`/api/excel?platform=Amazon&warehouse=${activeWarehouse}`} download
+            <a href={buildExcelUrl(activeWarehouse)} download
               className="ml-1 text-xs font-semibold px-3 py-1 rounded-full border border-blue-300 text-blue-700 hover:bg-blue-50 transition-colors">
               ⬇ {activeWarehouse} Excel
             </a>
