@@ -146,97 +146,6 @@ def _write_sheet(ws, invoices, title: str):
     ws.freeze_panes = f"A{data_start}"
 
 
-SUMMARY_HEADERS = [
-    "MONTH", "SALES COUNT", "SALES AMOUNT", "RETURNS COUNT", "RETURNS AMOUNT",
-    "TAXABLE VALUE", "CGST9", "SGST9", "IGST18", "NET AMOUNT",
-]
-SUMMARY_WIDTHS = [14, 13, 16, 14, 16, 16, 13, 13, 13, 16]
-SUMMARY_NUM_COLS = {3, 5, 6, 7, 8, 9, 10}   # 1-indexed amount columns
-
-
-def _write_month_summary(wb, by_month: dict, month_keys: list):
-    """First sheet: per-month sales/returns/GST totals — for auditors."""
-    ws = wb.create_sheet("Monthly Summary", 0)
-
-    ws["A1"] = "MONTH-WISE SUMMARY"
-    ws["A1"].font = TITLE_FONT
-    ws.row_dimensions[1].height = 22
-    ws.row_dimensions[2].height = 6
-
-    for col_idx, header in enumerate(SUMMARY_HEADERS, start=1):
-        cell = ws.cell(row=3, column=col_idx, value=header)
-        cell.font = HEADER_FONT
-        cell.fill = HEADER_FILL
-        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-        cell.border = BORDER
-    ws.row_dimensions[3].height = 28
-
-    data_start = 4
-    row_idx = data_start
-    for mk in month_keys:
-        rows = [r for r in by_month[mk] if not getattr(r, "cancelled", False)]
-        sales_count = returns_count = 0
-        sales_amt = returns_amt = 0.0
-        taxable = cgst = sgst = igst = 0.0
-        for inv in rows:
-            tv = inv.taxable_value or 0.0
-            cg = inv.cgst9 or 0.0
-            sg = inv.sgst9 or 0.0
-            ig = inv.igst18 or 0.0
-            amt = tv + cg + sg + ig
-            if (inv.transaction_type or "Sale") == "Return":
-                returns_count += 1
-                returns_amt += amt
-                taxable -= tv; cgst -= cg; sgst -= sg; igst -= ig
-            else:
-                sales_count += 1
-                sales_amt += amt
-                taxable += tv; cgst += cg; sgst += sg; igst += ig
-
-        values = [
-            _month_label(mk), sales_count, round(sales_amt, 2),
-            returns_count, round(returns_amt, 2),
-            round(taxable, 2), round(cgst, 2), round(sgst, 2), round(igst, 2),
-            round(sales_amt - returns_amt, 2),
-        ]
-        for col_idx, val in enumerate(values, start=1):
-            cell = ws.cell(row=row_idx, column=col_idx, value=val)
-            cell.border = BORDER
-            cell.alignment = Alignment(
-                vertical="center",
-                horizontal="right" if col_idx in SUMMARY_NUM_COLS else "center" if col_idx in (2, 4) else "left",
-            )
-            if col_idx in SUMMARY_NUM_COLS:
-                cell.number_format = "#,##0.00"
-            if col_idx == 1:
-                cell.font = Font(bold=True)
-        row_idx += 1
-
-    # TOTAL row
-    data_end = row_idx - 1
-    if data_end >= data_start:
-        tr = row_idx + 1
-        cell = ws.cell(row=tr, column=1, value="TOTAL")
-        cell.font = TOTAL_FONT
-        cell.fill = TOTAL_FILL
-        cell.alignment = Alignment(horizontal="center")
-        cell.border = BORDER
-        for col_idx in range(2, len(SUMMARY_HEADERS) + 1):
-            col_letter = get_column_letter(col_idx)
-            cell = ws.cell(row=tr, column=col_idx,
-                           value=f"=SUM({col_letter}{data_start}:{col_letter}{data_end})")
-            cell.font = TOTAL_FONT
-            cell.fill = TOTAL_FILL
-            cell.alignment = Alignment(horizontal="right", vertical="center")
-            cell.border = BORDER
-            if col_idx in SUMMARY_NUM_COLS:
-                cell.number_format = "#,##0.00"
-
-    for col_idx, width in enumerate(SUMMARY_WIDTHS, start=1):
-        ws.column_dimensions[get_column_letter(col_idx)].width = width
-    ws.freeze_panes = f"A{data_start}"
-
-
 def build_excel(invoices) -> bytes:
     wb = Workbook()
     first = True
@@ -303,7 +212,7 @@ def build_excel(invoices) -> bytes:
     # ── ALL combined ─────────────────────────────────────────────────────
     _add_sheet("ALL", list(invoices), "ALL INVOICES")
 
-    # ── Month-wise sheets (for auditors) ─────────────────────────────────
+    # ── Month-wise sheets — full detail, every row, split Sales vs Returns ─
     by_month: dict = defaultdict(list)
     for inv in invoices:
         by_month[_month_key(inv.inv_date)].append(inv)
@@ -312,15 +221,17 @@ def build_excel(invoices) -> bytes:
     if "Unknown" in by_month:
         month_keys.append("Unknown")
 
-    # One detail sheet per month (skip if a single month is already filtered)
+    # One Sales sheet + one Returns sheet per month, holding every individual
+    # invoice row (cancelled excluded). Skipped when only a single month is
+    # present — the platform Sales/Returns sheets already cover that case.
     if len(month_keys) > 1:
         for mk in month_keys:
             label = _month_label(mk)
-            _add_sheet(label, by_month[mk], f"{label.upper()} — ALL INVOICES")
-
-    # Summary sheet always goes first
-    if invoices:
-        _write_month_summary(wb, by_month, month_keys)
+            rows = [r for r in by_month[mk] if not getattr(r, "cancelled", False)]
+            sale_rows   = [r for r in rows if (r.transaction_type or "Sale") != "Return"]
+            return_rows = [r for r in rows if (r.transaction_type or "Sale") == "Return"]
+            _add_sheet(f"{label} Sales",   sale_rows,   f"{label.upper()} — SALES")
+            _add_sheet(f"{label} Returns", return_rows, f"{label.upper()} — RETURNS")
 
     buf = io.BytesIO()
     wb.save(buf)
