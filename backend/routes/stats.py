@@ -128,6 +128,16 @@ def get_stats(db: Session = Depends(get_db)):
         "count": 0, "sales_total": 0.0, "returns_total": 0.0,
     })
 
+    # For return-month attribution: a Return linked to a Sale is counted in the
+    # SALE's month (April sale returned in May → counts under April).
+    by_id = {inv.id: inv for inv in invoices}
+
+    def _eff_month(inv):
+        lid = inv.linked_sale_id
+        if (inv.transaction_type or "Sale") == "Return" and lid in by_id:
+            return _month_key(by_id[lid].inv_date)
+        return _month_key(inv.inv_date)
+
     for inv in invoices:
         taxable  = inv.taxable_value or 0.0
         cgst     = inv.cgst9 or 0.0
@@ -137,7 +147,7 @@ def get_stats(db: Session = Depends(get_db)):
         is_return = (inv.transaction_type or "Sale") == "Return"
         platform  = inv.platform or "Other"
         state     = _extract_state(inv.party_address or "")
-        month     = _month_key(inv.inv_date)
+        month     = _eff_month(inv)
 
         total_taxable += taxable
         total_cgst    += cgst

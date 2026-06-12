@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from database import engine, Base
-from routes import upload, records, excel, stats
+from routes import upload, records, excel, stats, returns
 
 Base.metadata.create_all(bind=engine)
 
@@ -28,6 +28,7 @@ app.include_router(upload.router, prefix="/api")
 app.include_router(records.router, prefix="/api")
 app.include_router(excel.router, prefix="/api")
 app.include_router(stats.router, prefix="/api")
+app.include_router(returns.router, prefix="/api")
 
 @app.get("/api/health")
 def health():

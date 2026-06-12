@@ -242,9 +242,19 @@ def build_excel(invoices) -> bytes:
     _add_sheet("ALL", list(invoices), "ALL INVOICES")
 
     # ── Month-wise sheets — full detail, every row, split Sales vs Returns ─
+    # A Return linked to a Sale is netted into the SALE's month (e.g. an April
+    # sale returned in May counts under April), so the months reconcile.
+    by_id = {inv.id: inv for inv in invoices if getattr(inv, "id", None) is not None}
+
+    def _eff_month(inv):
+        lid = getattr(inv, "linked_sale_id", None)
+        if (getattr(inv, "transaction_type", "Sale") == "Return") and lid in by_id:
+            return _month_key(by_id[lid].inv_date)
+        return _month_key(inv.inv_date)
+
     by_month: dict = defaultdict(list)
     for inv in invoices:
-        by_month[_month_key(inv.inv_date)].append(inv)
+        by_month[_eff_month(inv)].append(inv)
 
     month_keys = sorted(k for k in by_month if k != "Unknown")
     if "Unknown" in by_month:

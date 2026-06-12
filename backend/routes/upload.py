@@ -24,7 +24,10 @@ def _normalize_inv(inv_no: str) -> str:
     return inv_no.strip().upper().replace(" ", "").replace("-", "")
 
 
-def _cancel_matching_sale(db: Session, inv_no: str, platform: Optional[str]) -> Optional[int]:
+def _link_matching_sale(db: Session, inv_no: str, platform: Optional[str]) -> Optional[int]:
+    """Find the original Sale this Return corresponds to (by invoice number) and
+    return its id, so the return can be linked to it. The sale is NOT cancelled —
+    both rows are kept and the return is later netted into the sale's month."""
     if not inv_no:
         return None
 
@@ -32,7 +35,6 @@ def _cancel_matching_sale(db: Session, inv_no: str, platform: Optional[str]) -> 
     q = db.query(Invoice).filter(
         Invoice.inv_no == inv_no,
         Invoice.transaction_type == "Sale",
-        Invoice.cancelled == False,
         Invoice.status == "processed",
     )
     if platform:
@@ -44,7 +46,6 @@ def _cancel_matching_sale(db: Session, inv_no: str, platform: Optional[str]) -> 
         normalized = _normalize_inv(inv_no)
         candidates = db.query(Invoice).filter(
             Invoice.transaction_type == "Sale",
-            Invoice.cancelled == False,
             Invoice.status == "processed",
         )
         if platform:
@@ -54,10 +55,7 @@ def _cancel_matching_sale(db: Session, inv_no: str, platform: Optional[str]) -> 
                 sale = candidate
                 break
 
-    if sale:
-        sale.cancelled = True
-        return sale.id
-    return None
+    return sale.id if sale else None
 
 
 async def _ocr_one(filename: str, content: bytes) -> dict:
@@ -108,20 +106,20 @@ async def upload_documents(
                 "status": "error",
                 "error": ocr["error"],
                 "rows_added": 0,
-                "sales_cancelled": [],
+                "sales_linked": [],
             })
             continue
 
         added = 0
-        cancelled_ids = []
+        linked_ids = []
 
         for row in ocr["rows"]:
             linked_sale_id = None
             if transaction_type == "Return":
-                cid = _cancel_matching_sale(db, row.inv_no, row.platform)
-                if cid:
-                    linked_sale_id = cid
-                    cancelled_ids.append(cid)
+                sid = _link_matching_sale(db, row.inv_no, row.platform)
+                if sid:
+                    linked_sale_id = sid
+                    linked_ids.append(sid)
 
             db.add(Invoice(
                 platform=row.platform,
@@ -152,7 +150,7 @@ async def upload_documents(
             "rows_added": added,
             "transaction_type": transaction_type,
             "platform": ocr["rows"][0].platform if ocr["rows"] else None,
-            "sales_cancelled": cancelled_ids,
+            "sales_linked": linked_ids,
             "invoices": [
                 {
                     "inv_no": row.inv_no,

@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, NavLink } from "react-router-dom";
 import Dashboard from "./pages/Dashboard.jsx";
 import Upload from "./pages/Upload.jsx";
 import Records from "./pages/Records.jsx";
+import ReturnsMatch from "./pages/ReturnsMatch.jsx";
 
 class ErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { error: null }; }
@@ -56,6 +57,16 @@ const NAV = [
       </svg>
     ),
     label: "Records",
+  },
+  {
+    to: "/returns",
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+          d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+      </svg>
+    ),
+    label: "Returns",
   },
 ];
 
@@ -203,6 +214,7 @@ export default function App() {
             <Route path="/"        element={<Dashboard />} />
             <Route path="/upload"  element={<Upload />} />
             <Route path="/records" element={<Records />} />
+            <Route path="/returns" element={<ReturnsMatch />} />
           </Routes>
         </ErrorBoundary>
       </main>

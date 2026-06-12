@@ -98,7 +98,7 @@ function FileCard({ file, onRemove }) {
   const processed = file.status === "done" && file.result?.status === "processed";
   const isErr = file.status === "error" || file.result?.status === "error";
   const isReturn = file.result?.transaction_type === "Return";
-  const cancelled = file.result?.sales_cancelled?.length ?? 0;
+  const linked = file.result?.sales_linked?.length ?? 0;
   const invoices = file.result?.invoices ?? [];
   const multiRow = invoices.length > 1;
 
@@ -150,9 +150,9 @@ function FileCard({ file, onRemove }) {
                   {isReturn ? "↩ Return" : "✓ Sale"} · {file.result.rows_added} invoice{file.result.rows_added !== 1 ? "s" : ""}
                 </span>
               )}
-              {cancelled > 0 && (
+              {linked > 0 && (
                 <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
-                  {cancelled} sale{cancelled !== 1 ? "s" : ""} cancelled
+                  {linked} sale{linked !== 1 ? "s" : ""} matched
                 </span>
               )}
             </div>
@@ -293,7 +293,7 @@ export default function Upload() {
   const queuedCount = files.filter((f) => f.status === "queued").length;
   const doneCount   = files.filter((f) => f.status === "done").length;
   const totalRows   = files.reduce((s, f) => s + (f.result?.rows_added || 0), 0);
-  const totalCancelled = files.reduce((s, f) => s + (f.result?.sales_cancelled?.length || 0), 0);
+  const totalLinked = files.reduce((s, f) => s + (f.result?.sales_linked?.length || 0), 0);
 
   return (
     <div className="p-4 sm:p-8">
@@ -318,7 +318,7 @@ export default function Upload() {
             transactionType === "Return" ? "text-rose-600" : "text-emerald-700"
           }`}>
             {transactionType === "Return"
-              ? "⚠ Return document — matching sale invoices will be automatically cancelled"
+              ? "↩ Return document — automatically matched to its original sale (sale is kept; the return is netted into the sale's month)"
               : "✓ Sale document — invoices will be added as new sale records"}
           </p>
         </div>
@@ -381,9 +381,9 @@ export default function Upload() {
                   +{totalRows} row{totalRows !== 1 ? "s" : ""} added
                 </span>
               )}
-              {totalCancelled > 0 && (
+              {totalLinked > 0 && (
                 <span className="text-sm font-semibold text-amber-700">
-                  {totalCancelled} sale{totalCancelled !== 1 ? "s" : ""} cancelled
+                  {totalLinked} sale{totalLinked !== 1 ? "s" : ""} matched
                 </span>
               )}
             </div>
@@ -438,7 +438,7 @@ export default function Upload() {
               </div>
               <div className="flex gap-2">
                 <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 font-bold text-[10px] flex items-center justify-center flex-shrink-0">3</span>
-                <span>For <b>Returns</b>: the matching Sale invoice is automatically cancelled by INV NO</span>
+                <span>For <b>Returns</b>: matched to the original Sale by INV NO and netted into that sale's month</span>
               </div>
               <div className="flex gap-2">
                 <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 font-bold text-[10px] flex items-center justify-center flex-shrink-0">4</span>
